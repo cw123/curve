@@ -77,7 +77,7 @@ int OpenFileList(int num) {
         fdList[i] = -1;
     }
     while (count < num && index < 2000) {
-        filename = FLAGS_path + std::to_string(index++);
+        filename = FLAGS_path + std::to_string(index);
         int fd = 0;
         if (FLAGS_dsync) {
             fd = lfs->Open(filename, O_RDWR|O_NOATIME|O_DSYNC);
@@ -143,21 +143,6 @@ void* bthreadRun(void *arg) {
     return nullptr;
 }
 
-// int runAioTest() {
-//     int ret = OpenFileList(128);
-//     if (ret < 0) {
-//         return ret;
-//     }
-//     for (int i = 0; i < 128; i++) {
-//         bthread_start_background(&bth[i], NULL, bthreadRun, &fdList[i]);
-//     }
-
-//     for (int i = 0; i < 128; i++) {
-//         bthread_join(bth[i], nullptr);
-//     }
-//     return 0;
-// }
-
 void pthreadRun(int fd) {
     LOG(INFO) << "pthreadRun, fd = " << fd << ", count = " << FLAGS_iocount;
     // char writebuf[4096] = {0};
@@ -194,21 +179,6 @@ void pthreadRun(int fd) {
     return;
 }
 
-// int runPreadwriteTest() {
-//     int ret = OpenFileList(10);
-//     if (ret < 0) {
-//         LOG(ERROR) << "openFileList fail";
-//         return ret;
-//     }
-
-//     for (int i = 0; i < 10; i++) {
-//         th[i] = std::move(std::thread(pthreadRun, fdList[i]));
-//     }
-//     for (int i = 0; i < 10; i++) {
-//         th[i].join();
-//     }
-//     return 0;
-// }
 int runBthread(int num) {
     LOG(INFO) << "run bthread, thread num = " << num;
     int ret = OpenFileList(num);

@@ -127,6 +127,8 @@ fs.enable_renameat2=true
 fs.enable_coroutine=true
 # 是否使用异步接口aio
 fs.enable_aio=true
+# 是否使用epool
+fs.enable_epool=true
 # 每个chunkserver的aio的maxevent深度
 fs.max_event=128
 
