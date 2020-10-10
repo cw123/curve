@@ -44,6 +44,11 @@
 #include "src/common/crc32.h"
 #include "src/common/fs_util.h"
 
+static bvar::LatencyRecorder g_raft_apply_latency(
+	                                    "raft_apply");
+static bvar::LatencyRecorder g_concurrent_apply_latency(
+	                                    "concurrent_apply");
+
 namespace curve {
 namespace chunkserver {
 
@@ -238,11 +243,23 @@ void CopysetNode::on_apply(::braft::Iterator &iter) {
             CHECK(nullptr != chunkClosure)
                 << "ChunkClosure dynamic cast failed";
             std::shared_ptr<ChunkOpRequest> opRequest = chunkClosure->request_;
+
+	    opRequest->timer.stop();
+	    g_raft_apply_latency << opRequest->timer.u_elapsed();
+
             auto task = std::bind(&ChunkOpRequest::OnApply,
                                   opRequest,
                                   iter.index(),
                                   doneGuard.release());
-            concurrentapply_->Push(opRequest->ChunkId(), task);
+	    opRequest->timer2.start();
+	    butil::Timer timer;
+	    timer.start();
+
+	    opRequest->timer4.start();
+            //concurrentapply_->Push(opRequest->ChunkId(), task);
+	    task();
+	    timer.stop();
+	    g_concurrent_apply_latency << timer.u_elapsed();
         } else {
             // 获取log entry
             butil::IOBuf log = iter.data();
@@ -261,7 +278,10 @@ void CopysetNode::on_apply(::braft::Iterator &iter) {
                                   dataStore_,
                                   std::move(request),
                                   data);
-            concurrentapply_->Push(chunkId, task);
+            
+            opReq->timer4.start();
+	    //concurrentapply_->Push(chunkId, task);
+	    task();
         }
     }
 }

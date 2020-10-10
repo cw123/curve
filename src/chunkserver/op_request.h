@@ -66,6 +66,12 @@ class ChunkOpRequest : public std::enable_shared_from_this<ChunkOpRequest> {
                    ChunkResponse *response,
                    ::google::protobuf::Closure *done);
 
+    butil::Timer timer;
+    butil::Timer timer2;
+    butil::Timer timer3;
+
+    butil::Timer timer4;
+
     virtual ~ChunkOpRequest() = default;
 
     /**
@@ -162,7 +168,7 @@ class ChunkOpRequest : public std::enable_shared_from_this<ChunkOpRequest> {
     int Propose(const ChunkRequest *request,
                 const butil::IOBuf *data);
 
- protected:
+ public:
     // chunk持久化接口
     std::shared_ptr<CSDataStore> datastore_;
     // 复制组
