@@ -14,17 +14,12 @@
 #  limitations under the License.
 #
 
-load(
-    "//:copts.bzl",
-    "GCC_FLAGS",
-    "GCC_TEST_FLAGS",
-)
-
 COPTS = [
     "-DGFLAGS=gflags",
     "-DOS_LINUX",
     "-DSNAPPY",
     "-DHAVE_SSE42",
+    "-DHAVE_ZLIB",
     "-DNDEBUG",
     "-fno-omit-frame-pointer",
     "-momit-leaf-frame-pointer",
@@ -39,42 +34,32 @@ COPTS = [
     "-std=c++11",
 ]
 
-cc_test(
-    name = "block_device_client_test",
-    srcs = glob([
-        "block_device_client_test.cpp"
-    ]),
+cc_library(
+    name="mds",
+    hdrs=glob(["*.h"]),
+    srcs=glob(["*.cpp"],
+        exclude = ["main.cpp"]
+    ),
     copts = COPTS,
-    defines = ["UNIT_TEST"],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/client:include_client",
-        "//curvefs/src/client:fuse_client_lib",
-        "//test/client/mock:client_mock_lib",
-        "@com_google_googletest//:gtest",
-        "@com_google_googletest//:gtest_main",
+            "//external:brpc",
+            "//curvefs/proto:mds_cc_proto",
+            "//curvefs/proto:space_cc_proto",
+            "//src/common/concurrent:curve_concurrent",
+            "//src/common:curve_common",
     ],
 )
 
 cc_binary(
-    name = "fuse_client_test",
+    name = "curvefs_mds",
     srcs = glob([
-        "*.cpp",
-        "*.c",
-        "*.h"],
-        exclude = [ "block_device_client_test.cpp" ]
-    ),
-    copts = ["-I/usr/local/include/fuse3",
-             "-L/usr/local/lib/x86_64-linux-gnu"],
-    deps = [
-        "//external:gtest",
-        "//curvefs/src/client:fuse_client_lib",
-        "//curvefs/proto:metaserver_cc_proto",
-        "//curvefs/proto:mds_cc_proto",
-        "//curvefs/proto:space_cc_proto",
-    ],
-    linkopts = ["-lfuse3",
-                "-lpthread",
-                "-L/usr/local/lib/x86_64-linux-gnu"],
+        "main.cpp",
+    ]),
+    copts = COPTS,
     visibility = ["//visibility:public"],
+    deps = [
+        "//curvefs/src/mds:mds",
+    ],
 )
+

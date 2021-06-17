@@ -14,37 +14,39 @@
  *  limitations under the License.
  */
 
-
 /*
- * Project: curve
- * Created Date: Thur May 27 2021
- * Author: xuchaojie
+ * @Project: curve
+ * @Date: 2021-06-10 10:46:50
+ * @Author: chenwei
  */
 
-#ifndef CURVEFS_SRC_CLIENT_ERROR_CODE_H_
-#define CURVEFS_SRC_CLIENT_ERROR_CODE_H_
+#include <gtest/gtest.h>
+#include <gmock/gmock.h>
+
+using ::testing::AtLeast;
+using ::testing::StrEq;
+using ::testing::_;
+using ::testing::Return;
+using ::testing::ReturnArg;
+using ::testing::DoAll;
+using ::testing::SetArgPointee;
+using ::testing::SaveArg;
 
 namespace curvefs {
-namespace client {
+namespace mds {
+class MdsTest: public ::testing::Test {
+ protected:
+    void SetUp() override {
+        return;
+    }
 
-enum class CURVEFS_ERROR {
-    OK = 0,
-    FAILED = 1,
-    UNKNOWN = 2,
-    EXISTS = 3,
-    NOTEXIST = 4,
-    NO_SPACE = 5,
-    INVALIDPARAM = 6,
-    NOSPACE = 7,
-    BAD_FD   = 8,
+    void TearDown() override {
+        return;
+    }
 };
 
-inline std::ostream &operator<<(std::ostream &os, CURVEFS_ERROR code) {
-    os << static_cast<int>(code);
-    return os;
+TEST_F(MdsTest, test1) {
+    ASSERT_EQ(1, 1);
 }
-
-}  // namespace client
+}  // namespace mds
 }  // namespace curvefs
-
-#endif  // CURVEFS_SRC_CLIENT_ERROR_CODE_H_
