@@ -25,30 +25,90 @@
 namespace curvefs {
 namespace metaserver {
 MetaStatusCode DentryManager::CreateDentry(const Dentry& dentry) {
+    LOG(INFO) << "CreateDentry, fsId = " << dentry.fsid()
+              << ", inodeId = " << dentry.inodeid()
+              << ", parentId = " << dentry.parentinodeid()
+              << ", name = " << dentry.name();
     MetaStatusCode status = dentryStorage_->Insert(dentry);
-    return status;
+    if (status != MetaStatusCode::OK) {
+        LOG(ERROR) << "CreateDentry fail, fsId = " << dentry.fsid()
+              << ", inodeId = " << dentry.inodeid()
+              << ", parentId = " << dentry.parentinodeid()
+              << ", name = " << dentry.name()
+              << ", ret = " << MetaStatusCode_Name(status);
+        return status;
+    }
+
+    LOG(INFO) << "CreateDentry success, fsId = " << dentry.fsid()
+              << ", inodeId = " << dentry.inodeid()
+              << ", parentId = " << dentry.parentinodeid()
+              << ", name = " << dentry.name();
+    return MetaStatusCode::OK;
 }
 
 MetaStatusCode DentryManager::GetDentry(uint32_t fsId,
                                         uint64_t parentId,
                                         std::string name, Dentry *dentry) {
+    LOG(INFO) << "GetDentry, fsId = " << fsId
+              << ", parentId = " << parentId
+              << ", name = " << name;
     MetaStatusCode status = dentryStorage_->Get(DentryKey(fsId, parentId, name),
                                     dentry);
-    return status;
+    if (status != MetaStatusCode::OK) {
+        LOG(ERROR) << "GetDentry fail, fsId = " << fsId
+              << ", parentId = " << parentId
+              << ", name = " << name
+              << ", ret = " << MetaStatusCode_Name(status);
+        return status;
+    }
+
+    LOG(INFO) << "GetDentry success, fsId = " << fsId
+              << ", parentId = " << parentId
+              << ", name = " << name;
+    return MetaStatusCode::OK;
 }
 
 MetaStatusCode DentryManager::DeleteDentry(uint32_t fsId, uint64_t parentId,
                                         std::string name) {
+    LOG(INFO) << "DeleteDentry, fsId = " << fsId
+              << ", parentId = " << parentId
+              << ", name = " << name;
     MetaStatusCode status = dentryStorage_->Delete(
                                     DentryKey(fsId, parentId, name));
-    return status;
+    if (status != MetaStatusCode::OK) {
+        LOG(ERROR) << "DeleteDentry fail, fsId = " << fsId
+              << ", parentId = " << parentId
+              << ", name = " << name
+              << ", ret = " << MetaStatusCode_Name(status);
+        return status;
+    }
+
+    LOG(INFO) << "DeleteDentry success, fsId = " << fsId
+              << ", parentId = " << parentId
+              << ", name = " << name;
+    return MetaStatusCode::OK;
 }
 
 MetaStatusCode DentryManager::ListDentry(uint32_t fsId, uint64_t dirId,
                                         std::list<Dentry>* dentryList) {
+    LOG(INFO) << "ListDentry, fsId = " << fsId
+              << ", dirId = " << dirId;
     MetaStatusCode status = dentryStorage_->List(
                                 DentryParentKey(fsId, dirId), dentryList);
-    return status;
+    if (status != MetaStatusCode::OK) {
+        LOG(ERROR) << "ListDentry fail, fsId = " << fsId
+              << ", dirId = " << dirId
+              << ", ret = " << MetaStatusCode_Name(status);
+        return status;
+    }
+
+    LOG(INFO) << "ListDentry success, fsId = " << fsId
+              << ", dirId = " << dirId
+              << ", get count = " << dentryList->size();
+    for (auto it : *dentryList) {
+        LOG(INFO) << it.DebugString();
+    }
+    return MetaStatusCode::OK;
 }
 }  // namespace metaserver
 }  // namespace curvefs

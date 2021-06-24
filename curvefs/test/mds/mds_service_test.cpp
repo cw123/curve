@@ -26,6 +26,7 @@
 #include <brpc/server.h>
 #include "curvefs/src/mds/mds_service.h"
 #include "curvefs/test/mds/fake_space.h"
+#include "curvefs/test/mds/fake_metaserver.h"
 
 using ::testing::AtLeast;
 using ::testing::StrEq;
@@ -40,19 +41,27 @@ using ::testing::Mock;
 using ::curvefs::space::FakeSpaceImpl;
 using ::curvefs::space::SpaceStatusCode;
 using ::curvefs::space::InitSpaceResponse;
+using ::curvefs::metaserver::FakeMetaserverImpl;
 
 namespace curvefs {
 namespace mds {
 class MdsServiceTest: public ::testing::Test {
  protected:
     void SetUp() override {
-        SpaceOptions options;
-        options.spaceAddr = "127.0.0.1:6700";
-        options.rpcTimeoutMs = 500;
+        SpaceOptions spaceOptions;
+        spaceOptions.spaceAddr = "127.0.0.1:6700";
+        spaceOptions.rpcTimeoutMs = 500;
+        MetaserverOptions metaserverOptions;
+        metaserverOptions.metaserverAddr = "127.0.0.1:6700";
+        metaserverOptions.rpcTimeoutMs = 500;
         fsStorage_ = std::make_shared<MemoryFsStorage>();
-        spaceClient_ = std::make_shared<SpaceClient>(options);
-        fsManager_ = std::make_shared<FsManager>(fsStorage_, spaceClient_);
-        spaceClient_->Init();
+        spaceClient_ = std::make_shared<SpaceClient>(spaceOptions);
+        metaserverClient_ = std::make_shared<MetaserverClient>(
+                                        metaserverOptions);
+        fsManager_ = std::make_shared<FsManager>(fsStorage_, spaceClient_,
+                                                metaserverClient_);
+        ASSERT_TRUE(spaceClient_->Init());
+        ASSERT_TRUE(metaserverClient_->Init());
         return;
     }
 
@@ -85,6 +94,7 @@ class MdsServiceTest: public ::testing::Test {
     std::shared_ptr<FsManager> fsManager_;
     std::shared_ptr<FsStorage> fsStorage_;
     std::shared_ptr<SpaceClient> spaceClient_;
+    std::shared_ptr<MetaserverClient> metaserverClient_;
 };
 
 TEST_F(MdsServiceTest, test1) {
@@ -94,10 +104,14 @@ TEST_F(MdsServiceTest, test1) {
     ASSERT_EQ(server.AddService(&mdsService,
                           brpc::SERVER_DOESNT_OWN_SERVICE), 0);
 
-    // add mocke space service
+
     // MockSpaceService spaceService;
     FakeSpaceImpl spaceService;
     ASSERT_EQ(server.AddService(&spaceService,
+                          brpc::SERVER_DOESNT_OWN_SERVICE), 0);
+
+    FakeMetaserverImpl metaserverService;
+    ASSERT_EQ(server.AddService(&metaserverService,
                           brpc::SERVER_DOESNT_OWN_SERVICE), 0);
 
     // start rpc server
@@ -136,7 +150,7 @@ TEST_F(MdsServiceTest, test1) {
         fsinfo1 = createResponse.fsinfo();
         ASSERT_EQ(fsinfo1.fsid(), 1);
         ASSERT_EQ(fsinfo1.fsname(), "fs1");
-        ASSERT_EQ(fsinfo1.rootinodeid(), 0);
+        ASSERT_EQ(fsinfo1.rootinodeid(), 1);
         ASSERT_EQ(fsinfo1.capacity(), 4096 * 4096);
         ASSERT_EQ(fsinfo1.blocksize(), 4096);
         ASSERT_EQ(fsinfo1.mountnum(), 0);

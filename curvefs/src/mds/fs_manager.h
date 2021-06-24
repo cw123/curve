@@ -30,16 +30,19 @@
 #include "curvefs/src/mds/fs.h"
 #include "curvefs/src/mds/fs_storage.h"
 #include "curvefs/src/mds/space_client.h"
+#include "curvefs/src/mds/metaserver_client.h"
 
 namespace curvefs {
 namespace mds {
 class FsManager {
  public:
     explicit FsManager(std::shared_ptr<FsStorage> fsStorage,
-                       std::shared_ptr<SpaceClient> spaceClient) {
+                       std::shared_ptr<SpaceClient> spaceClient,
+                       std::shared_ptr<MetaserverClient> metaserverClient) {
        fsStorage_ = fsStorage;
        spaceClient_ = spaceClient;
-       nextFsId_ = 1;
+       metaserverClient_ = metaserverClient;
+       nextFsId_ = 1;  // TODO(cw123): get from storage
     }
 
     /**
@@ -127,11 +130,13 @@ class FsManager {
  private:
     uint32_t GetNextFsId();
     uint64_t GetRootId();
+    FSStatusCode CleanFsInodeAndDentry(uint32_t fsId);
 
  private:
     std::atomic<uint64_t> nextFsId_;
     std::shared_ptr<FsStorage> fsStorage_;
     std::shared_ptr<SpaceClient> spaceClient_;
+    std::shared_ptr<MetaserverClient> metaserverClient_;
 };
 }  // namespace mds
 }  // namespace curvefs

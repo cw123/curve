@@ -66,29 +66,41 @@ void MetaServerServiceImpl::ListDentry(
 
     // find last dentry
     std::string last;
+    bool findLast = false;
     auto iter = dentryList.begin();
     if (request->has_last()) {
         last = request->last();
+        LOG(INFO) << "last = " << last;
         for (; iter != dentryList.end(); ++iter) {
             if (iter->name() == last) {
                 iter++;
+                findLast = true;
                 break;
             }
         }
     }
 
+    if (!findLast) {
+        iter = dentryList.begin();
+    }
+
     uint32_t count = UINT32_MAX;
     if (request->has_count()) {
         count = request->count();
+        LOG(INFO) << "count = " << count;
     }
 
     uint64_t index = 0;
     while (iter != dentryList.end() && index < count) {
         Dentry *dentry = response->add_dentrys();
         dentry->CopyFrom(*iter);
+        LOG(INFO) << "return client, index = "
+                   << index << ", dentry :" << iter->DebugString();
         index++;
         iter++;
     }
+
+    LOG(INFO) << "return count = " << index;
 
     response->set_statuscode(status);
     return;
@@ -156,10 +168,14 @@ void MetaServerServiceImpl::CreateInode(
     FsFileType type = request->type();
     std::string symlink;
     if (type == FsFileType::TYPE_SYM_LINK) {
-        if (request->has_symlink()) {
-            symlink = request->symlink();
-        } else {
-            response->set_statuscode(MetaStatusCode::PARAM_ERROR);
+        if (!request->has_symlink()) {
+            response->set_statuscode(MetaStatusCode::SYM_LINK_EMPTY);
+            return;
+        }
+
+        symlink = request->symlink();
+        if (symlink.empty()) {
+            response->set_statuscode(MetaStatusCode::SYM_LINK_EMPTY);
             return;
         }
     }
@@ -169,6 +185,31 @@ void MetaServerServiceImpl::CreateInode(
     response->set_statuscode(status);
     if (status != MetaStatusCode::OK) {
         response->clear_inode();
+    }
+    return;
+}
+
+void MetaServerServiceImpl::CreateRootInode(
+                   ::google::protobuf::RpcController* controller,
+                   const ::curvefs::metaserver::CreateRootInodeRequest* request,
+                   ::curvefs::metaserver::CreateRootInodeResponse* response,
+                   ::google::protobuf::Closure* done) {
+    brpc::ClosureGuard doneGuard(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    uint32_t fsId = request->fsid();
+    uint32_t uid = request->uid();
+    uint32_t gid = request->gid();
+    uint32_t mode = request->mode();
+
+    MetaStatusCode status = inodeManager_->CreateRootInode(fsId, uid, gid,
+                                                            mode);
+    response->set_statuscode(status);
+    if (status != MetaStatusCode::OK) {
+        LOG(ERROR) << "CreateRootInode fail, fsId = " << fsId
+                   << ", uid = " << uid
+                   << ", gid = " << gid
+                   << ", mode = " << mode
+                   << ", retCode = " << MetaStatusCode_Name(status);
     }
     return;
 }
@@ -206,6 +247,7 @@ void MetaServerServiceImpl::UpdateInode(
     UPDATE_INODE(mode)
 
     if (request->has_volumeextentlist()) {
+        LOG(INFO) << "update inode has extent";
         inode.mutable_volumeextentlist()->CopyFrom(request->volumeextentlist());
         needUpdate = true;
     }

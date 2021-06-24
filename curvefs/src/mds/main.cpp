@@ -40,6 +40,9 @@ void LoadConfigFromCmdline(Configuration *conf) {
 int main(int argc, char **argv) {
     // config initialization
     google::ParseCommandLineFlags(&argc, &argv, false);
+    // initialize logging module
+    google::InitGoogleLogging(argv[0]);
+
     std::string confPath = FLAGS_confPath.c_str();
     auto conf = std::make_shared<Configuration>();
     conf->SetConfigPath(confPath);
@@ -53,8 +56,6 @@ int main(int argc, char **argv) {
                          << ", will log to /tmp";
         }
     }
-    // initialize logging module
-    google::InitGoogleLogging(argv[0]);
 
     curvefs::mds::Mds mds;
 
