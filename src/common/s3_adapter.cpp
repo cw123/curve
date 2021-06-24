@@ -94,6 +94,51 @@ void S3Adapter::Init(const std::string &path) {
     throttle_->UpdateThrottleParams(params);
 }
 
+void S3Adapter::Init(const S3AdapterOption &option) {
+    LOG(INFO) << "Loading s3 configurations";
+    //conf_.SetConfigPath(path);
+   
+    options_ = Aws::New<Aws::SDKOptions>("S3Adapter.SDKOptions");
+    options_->loggingOptions.logLevel =
+      Aws::Utils::Logging::LogLevel(option.loglevel);
+
+    Aws::InitAPI(*options_);
+    s3Address_ = option.s3Address.c_str();
+    s3Ak_ = option.ak.c_str();
+    s3Sk_ = option.sk.c_str();
+    bucketName_ = option.bucketName.c_str();
+    clientCfg_ = Aws::New<Aws::Client::ClientConfiguration>(
+        "S3Adapter.ClientConfiguration");
+    clientCfg_->scheme = Aws::Http::Scheme(option.scheme);
+    clientCfg_->verifySSL = option.verifySsl;
+    //clientCfg_->userAgent = conf_.GetStringValue("s3.user_agent_conf").c_str();  //NOLINT
+    clientCfg_->userAgent = "S3 Browser";
+    clientCfg_->maxConnections = option.maxConnections;
+    clientCfg_->connectTimeoutMs = option.connectTimeout;
+    clientCfg_->requestTimeoutMs = option.requestTimeout;
+    clientCfg_->endpointOverride = s3Address_;
+    auto asyncThreadNum = option.asyncThreadNum;
+    clientCfg_->executor =
+        Aws::MakeShared<Aws::Utils::Threading::PooledThreadExecutor>(
+            "S3Adapter.S3Client", asyncThreadNum);
+    s3Client_ = Aws::New<Aws::S3::S3Client>("S3Adapter.S3Client",
+            Aws::Auth::AWSCredentials(s3Ak_, s3Sk_),
+            *clientCfg_,
+            Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+            false);
+
+    ReadWriteThrottleParams params;
+    params.iopsTotal.limit = option.iopsTotalLimit;
+    params.iopsRead.limit = option.iopsReadLimit;
+    params.iopsWrite.limit = option.iopsWriteLimit;
+    params.bpsTotal.limit = option.bpsTotalMB * kMB;
+    params.bpsRead.limit = option.bpsReadMB * kMB;
+    params.bpsWrite.limit = option.bpsWriteMB * kMB;
+
+    throttle_ = new Throttle();
+    throttle_->UpdateThrottleParams(params);
+}
+
 void S3Adapter::Deinit() {
     Aws::ShutdownAPI(*options_);
     Aws::Delete<Aws::SDKOptions>(options_);
