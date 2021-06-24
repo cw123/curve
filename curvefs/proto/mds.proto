@@ -19,6 +19,11 @@ import "curvefs/proto/common.proto";
 package curvefs.mds;
 option cc_generic_services = true;
 
+enum FSType {
+    TYPE_VOLUME = 1;
+    TYPE_S3 = 2;
+}
+
 enum FSStatusCode {
     OK = 0;
     UNKNOWN_ERROR = 1;
@@ -59,9 +64,11 @@ message FsInfo {
     required uint64 rootInodeId = 4;
     required uint64 capacity = 5;
     required uint64 blockSize = 6;
-    required common.Volume volume = 7;
-    required uint32 mountNum = 8;
-    repeated MountPoint mountpoints = 9;
+    required uint32 mountNum = 7;
+    repeated MountPoint mountpoints = 8;
+    required FSType fsType = 9;
+    optional common.Volume volume = 10;
+    optional common.S3Info s3Info = 11;
 }
 
 message GetFsInfoResponse {
@@ -72,7 +79,9 @@ message GetFsInfoResponse {
 message CreateFsRequest {
     required string fsName = 1;
     required uint64 blockSize = 2;
-    required common.Volume volume = 3;
+    required FSType fsType = 3;
+    optional common.Volume volume = 4;
+    optional common.S3Info s3Info = 5;
 }
 
 message CreateFsResponse {
