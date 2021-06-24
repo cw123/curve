@@ -128,18 +128,38 @@ uint64_t BitmapAllocator::AllocSmall(uint64_t size,
 uint64_t BitmapAllocator::AllocBig(uint64_t size, const SpaceAllocateHint& hint,
                                    std::vector<PExtent>* exts) {
     uint64_t need = size;
-    auto allocated = AllocFromBitmap(need, hint, exts);
-    assert(allocated <= need);
-    need -= allocated;
-    if (need == 0) {
-        return size;
-    }
+    uint64_t allocated = 0;
 
-    allocated = AllocFromBitmapExtent(need, hint, exts);
-    assert(allocated <= need);
-    need -= allocated;
-    if (need == 0) {
-        return size;
+    // TODO(wuhanqing): improve this
+    if (hint.leftOffset == hint.INVALID_OFFSET &&
+        hint.rightOffset == hint.INVALID_OFFSET) {
+        allocated = AllocFromBitmap(need, hint, exts);
+        assert(allocated <= need);
+        need -= allocated;
+        if (need == 0) {
+            return size;
+        }
+
+        allocated = AllocFromBitmapExtent(need, hint, exts);
+        assert(allocated <= need);
+        need -= allocated;
+        if (need == 0) {
+            return size;
+        }
+    } else {
+        allocated = AllocFromBitmapExtent(need, hint, exts);
+        assert(allocated <= need);
+        need -= allocated;
+        if (need == 0) {
+            return size;
+        }
+
+        allocated = AllocFromBitmap(need, hint, exts);
+        assert(allocated <= need);
+        need -= allocated;
+        if (need == 0) {
+            return size;
+        }
     }
 
     allocated = AllocFromSmallExtent(need, hint, exts);
