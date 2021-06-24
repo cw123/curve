@@ -23,10 +23,12 @@
 #include "curvefs/src/mds/fs.h"
 namespace curvefs {
 namespace mds {
-MdsFsInfo::MdsFsInfo(uint32_t fsId, std::string fsName, uint64_t rootInodeId,
-        uint64_t capacity, uint64_t blockSize, const common::Volume& volume) {
+MdsFsInfo::MdsFsInfo(uint32_t fsId, std::string fsName, FsStatus status,
+                    uint64_t rootInodeId, uint64_t capacity,
+                    uint64_t blockSize, const common::Volume& volume) {
     fsId_ = fsId;
     fsName_ = fsName;
+    status_ = status;
     rootInodeId_ = rootInodeId;
     capacity_ = capacity;
     blockSize_ = blockSize;
@@ -38,6 +40,7 @@ void MdsFsInfo::ConvertToProto(FsInfo *file) {
     // ReadLockGuard readLockGuard(rwLock_);
     file->set_fsid(fsId_);
     file->set_fsname(fsName_);
+    file->set_status(status_);
     file->set_rootinodeid(rootInodeId_);
     file->set_capacity(capacity_);
     file->set_blocksize(blockSize_);
@@ -98,5 +101,14 @@ std::string MdsFsInfo::GetFsName() const {
 Volume MdsFsInfo::GetVolumeInfo() {
     return volume_;
 }
+
+void MdsFsInfo::SetStatus(FsStatus status) {
+    status_ = status;
+}
+
+FsStatus MdsFsInfo::GetStatus() {
+    return status_;
+}
+
 }  // namespace mds
 }  // namespace curvefs

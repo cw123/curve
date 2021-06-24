@@ -37,8 +37,9 @@ namespace mds {
 class MdsFsInfo {
  public:
     MdsFsInfo() {}
-    MdsFsInfo(uint32_t fsId, std::string fsName, uint64_t rootInodeId,
-         uint64_t capacity, uint64_t blockSize, const common::Volume& volume);
+    MdsFsInfo(uint32_t fsId, std::string fsName, FsStatus status,
+         uint64_t rootInodeId, uint64_t capacity, uint64_t blockSize,
+         const common::Volume& volume);
 
     /**
      * @brief convert MdsFsInfo to FsInfo
@@ -83,10 +84,13 @@ class MdsFsInfo {
     std::string GetFsName() const;
     Volume GetVolumeInfo();
     std::list<MountPoint> GetMountPointList();
+    void SetStatus(FsStatus status);
+    FsStatus GetStatus();
 
  private:
     uint32_t fsId_;
     std::string fsName_;
+    FsStatus status_;
     uint64_t rootInodeId_;
     uint64_t capacity_;
     uint64_t blockSize_;

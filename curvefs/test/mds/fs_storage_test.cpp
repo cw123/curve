@@ -48,7 +48,7 @@ class FSStorageTest: public ::testing::Test {
 TEST_F(FSStorageTest, test1) {
     MemoryFsStorage storage;
     common::Volume volume;
-    MdsFsInfo fs1(1, "name1", 0, 100, 10, volume);
+    MdsFsInfo fs1(1, "name1", FsStatus::NEW, 0, 100, 10, volume);
     ASSERT_EQ(FSStatusCode::OK, storage.Insert(fs1));
     ASSERT_EQ(FSStatusCode::FS_EXIST, storage.Insert(fs1));
 }

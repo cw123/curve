@@ -30,18 +30,27 @@ namespace mds {
 void Mds::InitOptions(std::shared_ptr<Configuration> conf) {
     conf_ = conf;
     conf_->GetValueFatalIfFail("mds.listen.addr", &options_.mdsListenAddr);
-    conf_->GetValueFatalIfFail("space..addr",
+    conf_->GetValueFatalIfFail("space.addr",
                                 &options_.spaceOptions.spaceAddr);
     conf_->GetValueFatalIfFail("space.rpcTimeoutMs",
                                 &options_.spaceOptions.rpcTimeoutMs);
+    conf_->GetValueFatalIfFail("metaserver.addr",
+                                &options_.metaserverOptions.metaserverAddr);
+    conf_->GetValueFatalIfFail("metaserver.rpcTimeoutMs",
+                                &options_.metaserverOptions.rpcTimeoutMs);
+
 }
 
 void Mds::Init() {
     LOG(INFO) << "Init MDS start";
     fsStorage_ = std::make_shared<MemoryFsStorage>();
     spaceClient_ = std::make_shared<SpaceClient>(options_.spaceOptions);
-    fsManager_ = std::make_shared<FsManager>(fsStorage_, spaceClient_);
-    LOG_IF(FATAL, spaceClient_->Init())
+    metaserverClient_ = std::make_shared<MetaserverClient>(
+                                            options_.metaserverOptions);
+    fsManager_ = std::make_shared<FsManager>(fsStorage_, spaceClient_,
+                                         metaserverClient_);
+
+    LOG_IF(FATAL, !spaceClient_->Init())
         << "spaceClient Init fail";
     inited_ = true;
     LOG(INFO) << "Init MDS success";

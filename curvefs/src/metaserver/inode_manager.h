@@ -35,13 +35,14 @@ class InodeManager {
  public:
     explicit InodeManager(std::shared_ptr<InodeStorage> inodeStorage) {
        inodeStorage_ = inodeStorage;
-       nextInodeId_ = 1;
+       nextInodeId_ = 2;
     }
 
     MetaStatusCode CreateInode(uint32_t fsId, uint64_t length, uint32_t uid,
                                 uint32_t gid, uint32_t mode, FsFileType type,
                                 std::string symlink, Inode *inode);
-
+    MetaStatusCode CreateRootInode(uint32_t fsId, uint32_t uid,
+                                uint32_t gid, uint32_t mode);
     MetaStatusCode GetInode(uint32_t fsId, uint64_t inodeId, Inode *inode);
 
     MetaStatusCode DeleteInode(uint32_t fsId, uint64_t inodeId);

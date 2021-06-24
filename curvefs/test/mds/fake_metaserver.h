@@ -15,33 +15,22 @@
  */
 
 /*
- * Project: curve
- * Created Date: 2021-05-19
- * Author: chenwei
+ * @Project: curve
+ * @Date: 2021-06-24 16:53:31
+ * @Author: chenwei
  */
-
-#ifndef CURVEFS_SRC_METASERVER_METASERVER_SERVICE_H_
-#define CURVEFS_SRC_METASERVER_METASERVER_SERVICE_H_
+#ifndef CURVEFS_TEST_MDS_FAKE_METASERVER_H_
+#define CURVEFS_TEST_MDS_FAKE_METASERVER_H_
 
 #include <brpc/closure_guard.h>
 #include <brpc/controller.h>
-#include <memory>
 #include "curvefs/proto/metaserver.pb.h"
-#include "curvefs/src/metaserver/dentry_storage.h"
-#include "curvefs/src/metaserver/dentry_manager.h"
-#include "curvefs/src/metaserver/inode_storage.h"
-#include "curvefs/src/metaserver/inode_manager.h"
 
 namespace curvefs {
 namespace metaserver {
-class MetaServerServiceImpl: public MetaServerService {
+class FakeMetaserverImpl : public MetaServerService {
  public:
-    MetaServerServiceImpl(std::shared_ptr<InodeManager> inodeManager,
-                          std::shared_ptr<DentryManager> dentryManager) {
-        inodeManager_ = inodeManager;
-        dentryManager_ = dentryManager;
-    }
-
+    FakeMetaserverImpl() {}
     void GetDentry(::google::protobuf::RpcController* controller,
                     const ::curvefs::metaserver::GetDentryRequest* request,
                        ::curvefs::metaserver::GetDentryResponse* response,
@@ -78,12 +67,8 @@ class MetaServerServiceImpl: public MetaServerService {
                        const ::curvefs::metaserver::DeleteInodeRequest* request,
                        ::curvefs::metaserver::DeleteInodeResponse* response,
                        ::google::protobuf::Closure* done);
-
- private:
-    std::shared_ptr<InodeManager> inodeManager_;
-    std::shared_ptr<DentryManager> dentryManager_;
 };
+
 }  // namespace metaserver
 }  // namespace curvefs
-
-#endif  // CURVEFS_SRC_METASERVER_METASERVER_SERVICE_H_
+#endif  // CURVEFS_TEST_MDS_FAKE_METASERVER_H_

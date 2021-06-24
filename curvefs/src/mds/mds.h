@@ -36,6 +36,7 @@ namespace mds {
 struct MDSOptions {
     std::string mdsListenAddr;
     SpaceOptions spaceOptions;
+    MetaserverOptions metaserverOptions;
 };
 
 class Mds {
@@ -55,6 +56,7 @@ class Mds {
     std::shared_ptr<FsManager> fsManager_;
     std::shared_ptr<FsStorage> fsStorage_;
     std::shared_ptr<SpaceClient> spaceClient_;
+    std::shared_ptr<MetaserverClient> metaserverClient_;
     MDSOptions options_;
 };
 }  // namespace mds

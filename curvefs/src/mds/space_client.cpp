@@ -97,7 +97,7 @@ FSStatusCode SpaceClient::UnInitSpace(uint32_t fsId) {
 
     if (response.status() != SpaceStatusCode::SPACE_OK) {
         LOG(ERROR) << "UnInitSpace failed, ret = "
-                   << FSStatusCode::INIT_SPACE_ERROR;
+                   << FSStatusCode::UNINIT_SPACE_ERROR;
         return FSStatusCode::UNINIT_SPACE_ERROR;
     }
     return FSStatusCode::OK;

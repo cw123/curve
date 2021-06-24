@@ -20,28 +20,59 @@
  * Author: chenwei
  */
 #include <glog/logging.h>
+#include <sys/stat.h>  // for S_IFDIR
 #include "curvefs/src/mds/fs_manager.h"
+#include "curvefs/src/common/define.h"
 namespace curvefs {
 namespace mds {
 FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
                 curvefs::common::Volume volume, FsInfo* fsInfo) {
-    // 1、query fs
+    // 1. query fs
     if (fsStorage_->Exist(fsName)) {
         LOG(WARNING) << "CreateFs fail, fs exist, fsName = " << fsName
                   << ", blockSize = " << blockSize;
         return FSStatusCode::FS_EXIST;
     }
 
-    // 2、create fs
-    MdsFsInfo newFsInfo(GetNextFsId(), fsName, GetRootId(), volume.volumesize(),
-                        blockSize, volume);
+    // 2. create fs
+    MdsFsInfo newFsInfo(GetNextFsId(), fsName, FsStatus::NEW, GetRootId(),
+                        volume.volumesize(), blockSize, volume);
 
-    // 3、insert fs
+    // 3. insert fs, fs status is NEW
     FSStatusCode ret = fsStorage_->Insert(newFsInfo);
     if (ret != FSStatusCode::OK) {
-        LOG(WARNING) << "CreateFs fail, insert fs fail, fsName = " << fsName
+        LOG(ERROR) << "CreateFs fail, insert fs fail, fsName = " << fsName
                    << ", blockSize = " << blockSize
-                   << ",ret = " << FSStatusCode_Name(ret);
+                   << ", ret = " << FSStatusCode_Name(ret);
+        return ret;
+    }
+
+    // 4. use metaserver interface, insert rootinode
+    uint32_t fsId = newFsInfo.GetFsId();
+    uint32_t uid = 0;  // TODO(cw123)
+    uint32_t gid = 0;  // TODO(cw123)
+    uint32_t mode = S_IFDIR | 0777;  // TODO(cw123)
+    ret = metaserverClient_->CreateRootInode(fsId, uid, gid, mode);
+    if (ret != FSStatusCode::OK) {
+        LOG(ERROR) << "CreateFs fail, insert root inode fail"
+                   << ", fsName = " << fsName
+                   << ", blockSize = " << blockSize
+                   << ", ret = " << FSStatusCode_Name(ret);
+        // TODO(cw123): delete fsinfo
+        return ret;
+    }
+
+    // 5. update fs status to INITED
+    newFsInfo.SetStatus(FsStatus::INITED);
+    ret = fsStorage_->Update(newFsInfo);
+    if (ret != FSStatusCode::OK) {
+        LOG(ERROR) << "CreateFs fail, update fs to inited fail"
+                   << ", fsName = " << fsName
+                   << ", blockSize = " << blockSize
+                   << ", ret = " << FSStatusCode_Name(ret);
+        // TODO(cw123): delete inode
+        // TODO(cw123): delete fsinfo
+        return ret;
     }
 
     newFsInfo.ConvertToProto(fsInfo);
@@ -49,7 +80,7 @@ FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
 }
 
 FSStatusCode FsManager::DeleteFs(std::string fsName) {
-    // 1、query fs
+    // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
     if (ret != FSStatusCode::OK) {
@@ -58,7 +89,7 @@ FSStatusCode FsManager::DeleteFs(std::string fsName) {
         return ret;
     }
 
-    // 2、check mount point num
+    // 2. check mount point num
     if (!mdsFsInfo.MountPointEmpty()) {
         LOG(WARNING) << "DeleteFs fail, mount point exist, fsName = " << fsName;
         for (auto it : mdsFsInfo.GetMountPointList()) {
@@ -68,9 +99,42 @@ FSStatusCode FsManager::DeleteFs(std::string fsName) {
         return FSStatusCode::FS_BUSY;
     }
 
-    // 3、use space interface, destory space, todo
+    // 3. check fs status
+    FsStatus status = mdsFsInfo.GetStatus();
+    switch (status) {
+        case FsStatus::NEW:
+        case FsStatus::INITED:
+            // update fs status to deleting
+            mdsFsInfo.SetStatus(FsStatus::DELETING);
+            ret = fsStorage_->Update(mdsFsInfo);
+            if (ret != FSStatusCode::OK) {
+                LOG(ERROR) << "DeleteFs fail, update fs to deleting fail"
+                        << ", fsName = " << fsName
+                        << ", ret = " << FSStatusCode_Name(ret);
+                return ret;
+            }
+            break;
+        case FsStatus::DELETING:
+            LOG(WARNING) << "DeleteFs already in deleting, fsName = " << fsName;
+            break;
+        default:
+            LOG(ERROR) << "DeleteFs fs in wrong status, fsName = " << fsName
+                       << ", fs status = " << FsStatus_Name(status);
+            return FSStatusCode::UNKNOWN_ERROR;
+    }
 
-    // 4、delete fs
+    // 4. use metaserver interface, delete inode and dentry, todo
+    ret = CleanFsInodeAndDentry(mdsFsInfo.GetFsId());
+    if (ret != FSStatusCode::OK) {
+        LOG(ERROR) << "DeleteFs fail,clean inode and dentry fail"
+                        << ", fsName = " << fsName
+                        << ", ret = " << FSStatusCode_Name(ret);
+        return ret;
+    }
+
+    // 5. use space interface, destory space, todo
+
+    // 6. delete fs
     ret = fsStorage_->Delete(fsName);
     if (ret != FSStatusCode::OK) {
         LOG(WARNING) << "DeleteFs fail, delelte fs faile, fsName = " << fsName
@@ -83,7 +147,7 @@ FSStatusCode FsManager::DeleteFs(std::string fsName) {
 
 FSStatusCode FsManager::MountFs(std::string fsName, MountPoint mountpoint,
                         FsInfo* fsInfo) {
-    // 1、query fs
+    // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
     if (ret != FSStatusCode::OK) {
@@ -92,7 +156,25 @@ FSStatusCode FsManager::MountFs(std::string fsName, MountPoint mountpoint,
         return ret;
     }
 
-    // 2、if mount point exist, return MOUNT_POINT_EXIST
+    // 2. check fs status
+    FsStatus status = mdsFsInfo.GetStatus();
+    switch (status) {
+        case FsStatus::NEW:
+            LOG(WARNING) << "MountFs fs is not inited, fsName = " << fsName;
+            return FSStatusCode::NOT_INITED;
+        case FsStatus::INITED:
+            // inited status, go on process
+            break;
+        case FsStatus::DELETING:
+            LOG(WARNING) << "MountFs fs is in deleting, fsName = " << fsName;
+            return FSStatusCode::UNDER_DELETRING;
+        default:
+            LOG(ERROR) << "MountFs fs in wrong status, fsName = " << fsName
+                       << ", fs status = " << FsStatus_Name(status);
+            return FSStatusCode::UNKNOWN_ERROR;
+    }
+
+    // 3. if mount point exist, return MOUNT_POINT_EXIST
     if (mdsFsInfo.MountPointExist(mountpoint)) {
         LOG(WARNING) << "MountFs fail, mount point exist, fsName = " << fsName
                   << ", host = " << mountpoint.host()
@@ -100,34 +182,38 @@ FSStatusCode FsManager::MountFs(std::string fsName, MountPoint mountpoint,
         return FSStatusCode::MOUNT_POINT_EXIST;
     }
 
-    // 3、If this is the first mountpoint, init space,
+    // 4. If this is the first mountpoint, init space,
     if (mdsFsInfo.MountPointEmpty()) {
         FsInfo tempFsInfo;
         mdsFsInfo.ConvertToProto(&tempFsInfo);
         ret = spaceClient_->InitSpace(tempFsInfo);
         if (ret != FSStatusCode::OK) {
             LOG(ERROR) << "MountFs fail, init space fail, fsName = " << fsName
+                       << ", host = " << mountpoint.host()
+                       << ", mountdir = " << mountpoint.mountdir()
                        << ", errCode = " << FSStatusCode_Name(ret);
             return ret;
         }
     }
 
-    // 4、insert mountpoint
+    // 5. insert mountpoint
     mdsFsInfo.AddMountPoint(mountpoint);
     ret = fsStorage_->Update(mdsFsInfo);
     if (ret != FSStatusCode::OK) {
         LOG(WARNING) << "MountFs fail, update fs fail, fsName = " << fsName
-                       << ", errCode = " << FSStatusCode_Name(ret);
+                     << ", host = " << mountpoint.host()
+                     << ", mountdir = " << mountpoint.mountdir()
+                     << ", errCode = " << FSStatusCode_Name(ret);
         return ret;
     }
 
-    // 5、返回fs info
+    // 6. convert fs info
     mdsFsInfo.ConvertToProto(fsInfo);
     return FSStatusCode::OK;
 }
 
 FSStatusCode FsManager::UmountFs(std::string fsName, MountPoint mountpoint) {
-    // 1、query fs
+    // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
     if (ret != FSStatusCode::OK) {
@@ -136,7 +222,7 @@ FSStatusCode FsManager::UmountFs(std::string fsName, MountPoint mountpoint) {
         return ret;
     }
 
-    // 2、umount
+    // 2. umount
     ret = mdsFsInfo.DeleteMountPoint(mountpoint);
     if (ret != FSStatusCode::OK) {
         LOG(WARNING) << "UmountFs fail, delete mount point fail, fsName = " << fsName  // NOLINT
@@ -151,6 +237,7 @@ FSStatusCode FsManager::UmountFs(std::string fsName, MountPoint mountpoint) {
         return ret;
     }
 
+    // 3. if no mount point exist, uninit space
     if (mdsFsInfo.MountPointEmpty()) {
         ret = spaceClient_->UnInitSpace(mdsFsInfo.GetFsId());
         if (ret != FSStatusCode::OK) {
@@ -164,7 +251,7 @@ FSStatusCode FsManager::UmountFs(std::string fsName, MountPoint mountpoint) {
 }
 
 FSStatusCode FsManager::GetFsInfo(std::string fsName, FsInfo* fsInfo) {
-    // 1、query fs
+    // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
     if (ret != FSStatusCode::OK) {
@@ -178,7 +265,7 @@ FSStatusCode FsManager::GetFsInfo(std::string fsName, FsInfo* fsInfo) {
 }
 
 FSStatusCode FsManager::GetFsInfo(uint32_t fsId, FsInfo* fsInfo) {
-    // 1、query fs
+    // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsId, &mdsFsInfo);
     if (ret != FSStatusCode::OK) {
@@ -193,7 +280,7 @@ FSStatusCode FsManager::GetFsInfo(uint32_t fsId, FsInfo* fsInfo) {
 
 FSStatusCode FsManager::GetFsInfo(std::string fsName, uint32_t fsId,
                                 FsInfo* fsInfo) {
-    // 1、query fs by fsName
+    // 1. query fs by fsName
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
     if (ret != FSStatusCode::OK) {
@@ -202,7 +289,7 @@ FSStatusCode FsManager::GetFsInfo(std::string fsName, uint32_t fsId,
         return ret;
     }
 
-    // 2、check if
+    // 2. check if
     if (mdsFsInfo.GetFsId() != fsId) {
         LOG(WARNING) << "GetFsInfo fail, fsId missmatch, fsName = " << fsName
                      << ", param fsId = " << fsId
@@ -219,8 +306,13 @@ uint32_t FsManager::GetNextFsId() {
 }
 
 uint64_t FsManager::GetRootId() {
-    return 0;
+    return ROOTINODEID;
 }
 
+FSStatusCode FsManager::CleanFsInodeAndDentry(uint32_t fsId) {
+    // TODO(cw123) : to be implemented
+    LOG(WARNING) << "CleanFsInodeAndDentry not implemented, return OK!";
+    return FSStatusCode::OK;
+}
 }  // namespace mds
 }  // namespace curvefs
