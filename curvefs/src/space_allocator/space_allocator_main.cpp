@@ -31,7 +31,7 @@ DEFINE_string(listenAddr, "0.0.0.0:19999", "space allocator service address");
 int Run(int argc, char* argv[]) {
     google::ParseCommandLineFlags(&argc, &argv, true);
 
-    FLAGS_log_dir = "/home/wuhanqing/log";
+    FLAGS_log_dir = "/tmp/";
     google::InitGoogleLogging(argv[0]);
 
     std::unique_ptr<SpaceManager> spaceManager(
