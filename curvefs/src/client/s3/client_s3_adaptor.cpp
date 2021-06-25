@@ -397,6 +397,7 @@ int S3ClientAdaptor::Read(Inode *inode, uint64_t offset,
                 request.chunkInfo.set_offset(offset);
                 request.chunkInfo.set_len(length);
                 request.readOffset = readOffset;
+                readOffset += length;
                 length = 0;          
             } else {
                 request.chunkInfo = tmp;
@@ -446,7 +447,7 @@ int S3ClientAdaptor::Read(Inode *inode, uint64_t offset,
     }
 
     std::vector<S3ReadResponse>::iterator iter = responses.begin();
-    for (; iter != responses.end(); iter) {
+    for (; iter != responses.end(); iter++) {
         strncpy(buf + iter->readOffset, iter->dataBuf, iter->bufLen);                
     }
     
@@ -459,18 +460,36 @@ int S3ClientAdaptor::handleReadRequest(std::vector<S3ReadRequest> requests, std:
     for (;iter != requests.end(); iter++) {
         S3ReadResponse response;
         
-        // uint64_t start = iter->chunkInfo.offset() % chunkSize_ / blockSize_;
-        //uint64_t end = iter->chunkInfo.len() % chunkSize_ / blockSize_;
+        uint64_t blockIndex = iter->chunkInfo.offset() % chunkSize_ / blockSize_;
+        uint64_t blockPos = iter->chunkInfo.offset() % chunkSize_ % blockSize_;
+        uint64_t len = iter->chunkInfo.len();
+        uint64_t end = len % chunkSize_ / blockSize_;
+        response.dataBuf = new char[len];
+        uint64_t n = 0;
+        uint64_t readOffset = 0;
+        while (len > 0) {
+            if (blockPos + len > blockSize_) {
+                n = blockSize_ - blockPos;
+            } else {
+                n = len;
+            }
+            
+            std::string name = GenerateObjectName(iter->chunkInfo.chunkid(), blockIndex, iter->chunkInfo.version());
+            int readLen = client_->Download(name, response.dataBuf + readOffset, iter->chunkInfo.offset(), n);
+            if (readLen < 0) {
+                LOG(ERROR) << "download name:" << name <<" offset:" << iter->chunkInfo.offset() << " len:" << iter->chunkInfo.len() <<"fail:" << readLen;    
+                return readLen;        
+            }
 
-        blockIndex = iter->chunkInfo.offset() % chunkSize_ / blockSize_;
-        std::string name = GenerateObjectName(iter->chunkInfo.chunkid(), blockIndex, iter->chunkInfo.version());
-        int ret = client_->Download(name, response.dataBuf, iter->chunkInfo.offset(), iter->chunkInfo.len());
-        if (ret < 0) {
-            LOG(ERROR) << "download name:" << name <<" offset:" << iter->chunkInfo.offset() << " len:" << iter->chunkInfo.len() <<"fail:" << ret;    
-            return ret;        
+            len -= readLen;
+            readOffset += readLen;
+            blockIndex++;
+            blockPos = (blockPos + n) % blockSize_;
         }
+  
         response.readOffset = iter->readOffset;
-        response.bufLen = ret;
+        response.bufLen = readOffset;
+        (*responses).push_back(response);
     }
     
     return 0;

@@ -84,7 +84,7 @@ class ClientS3AdaptorTest : public testing::Test {
         s3ClientAdaptor_.Init(option, client);
         */
         s3ClientAdaptor_.Init(option, &mockS3Client_);  
-    } 
+    }
 
     void TearDown() override {
         server_.Stop(0);
@@ -99,19 +99,24 @@ class ClientS3AdaptorTest : public testing::Test {
     brpc::Server server_;
 };
 
+void InitInode(Inode* inode) {
+    inode->set_inodeid(1);
+    inode->set_fsid(2);
+    inode->set_length(0);
+    inode->set_ctime(1623835517);
+    inode->set_mtime(1623835517);
+    inode->set_atime(1623835517);
+    inode->set_uid(1);
+    inode->set_gid(1);
+    inode->set_mode(1);
+    inode->set_nlink(1);
+    inode->set_type(curvefs::metaserver::FsFileType::TYPE_S3);
+}
+
 TEST_F(ClientS3AdaptorTest, test_first_write) {
     curvefs::metaserver::Inode inode;
-    inode.set_inodeid(1);
-    inode.set_fsid(2);
-    inode.set_length(0);
-    inode.set_ctime(1623835517);
-    inode.set_mtime(1623835517);
-    inode.set_atime(1623835517);
-    inode.set_uid(1);
-    inode.set_gid(1);
-    inode.set_mode(1);
-    inode.set_nlink(1);
-    inode.set_type(curvefs::metaserver::FsFileType::TYPE_S3);
+    
+    InitInode(&inode);
     uint64_t offset = 0;
     uint64_t len = 2 * 1024 * 1024;
     char *buf = new char[len];
@@ -136,21 +141,11 @@ TEST_F(ClientS3AdaptorTest, test_first_write) {
     buf = NULL;
 }
 
-#if 0
 TEST_F(ClientS3AdaptorTest, test_read_one_chunk) {
     uint64_t readFileLen = 2 * 1024 * 1024;
     curvefs::metaserver::Inode inode;
-    inode.set_inodeid(1);
-    inode.set_fsid(2);
-    inode.set_length(0);
-    inode.set_ctime(1623835517);
-    inode.set_mtime(1623835517);
-    inode.set_atime(1623835517);
-    inode.set_uid(1);
-    inode.set_gid(1);
-    inode.set_mode(1);
-    inode.set_nlink(1);
-    inode.set_type(curvefs::metaserver::FsFileType::TYPE_S3);
+    
+    InitInode(&inode);
     S3ChunkInfoList *s3ChunkInfoList = new S3ChunkInfoList();
     S3ChunkInfo *s3ChunkInfo = s3ChunkInfoList->add_s3chunks();
     s3ChunkInfo->set_chunkid(25);
@@ -162,15 +157,19 @@ TEST_F(ClientS3AdaptorTest, test_read_one_chunk) {
     uint64_t offset = 0;
     uint64_t len = 2 * 1024 * 1024;
     char *buf = new char[len];
-    /*
-    EXPECT_CALL(mockS3Client_, Upload(_, _, _))
-        .WillRepeatedly(Return(1 * 1024 * 1024));*/
+    char *tmpbuf = new char[len];
+    memset(tmpbuf, 'a', len);
+    
+    EXPECT_CALL(mockS3Client_, Download(_, _, _, _))
+        .WillRepeatedly(
+                 DoAll(SetArgPointee<1>(*tmpbuf),
+                Return(1 * 1024 * 1024)));
     int ret = s3ClientAdaptor_.Read(&inode, offset, len, buf);
-    //ASSERT_EQ(len, ret);
+    ASSERT_EQ(len, ret);
     ASSERT_EQ('a', buf[0]);
     delete buf;
     buf = NULL;
 }
-#endif
+
 }
 }
