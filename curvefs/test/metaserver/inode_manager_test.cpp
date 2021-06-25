@@ -77,13 +77,13 @@ TEST_F(InodeManagerTest, test1) {
     ASSERT_EQ(manager.CreateInode(fsId, length, uid, gid, mode,
                                   type, symlink, &inode1),
               MetaStatusCode::OK);
-    ASSERT_EQ(inode1.inodeid(), 1);
+    ASSERT_EQ(inode1.inodeid(), 2);
 
     Inode inode2;
     ASSERT_EQ(manager.CreateInode(fsId, length, uid, gid, mode,
                                   type, symlink, &inode2),
               MetaStatusCode::OK);
-    ASSERT_EQ(inode2.inodeid(), 2);
+    ASSERT_EQ(inode2.inodeid(), 3);
 
     Inode inode3;
     ASSERT_EQ(manager.CreateInode(fsId, length, uid, gid, mode,
@@ -93,7 +93,7 @@ TEST_F(InodeManagerTest, test1) {
     ASSERT_EQ(manager.CreateInode(fsId, length, uid, gid, mode,
                     FsFileType::TYPE_SYM_LINK, "SYMLINK", &inode3),
               MetaStatusCode::OK);
-    ASSERT_EQ(inode3.inodeid(), 3);
+    ASSERT_EQ(inode3.inodeid(), 4);
 
     // GET
     Inode temp1;

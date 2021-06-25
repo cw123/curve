@@ -19,6 +19,7 @@ COPTS = [
     "-DOS_LINUX",
     "-DSNAPPY",
     "-DHAVE_SSE42",
+    "-DHAVE_ZLIB",
     "-DNDEBUG",
     "-fno-omit-frame-pointer",
     "-momit-leaf-frame-pointer",
@@ -34,32 +35,11 @@ COPTS = [
 ]
 
 cc_library(
-    name="metaserver",
+    name="curvefs_common",
     hdrs=glob(["*.h"]),
     srcs=glob(["*.cpp"],
-        exclude = ["main.cpp"],
     ),
     copts = COPTS,
     visibility = ["//visibility:public"],
-    deps = [
-            "//external:brpc",
-            "//curvefs/proto:metaserver_cc_proto",
-            "//src/common/concurrent:curve_concurrent",
-            "//src/common:curve_common",
-            "//curvefs/src/common:curvefs_common",
-    ],
+    deps = [],
 )
-
-cc_binary(
-    name = "curvefs_metaserver",
-    srcs = glob([
-        "main.cpp",
-    ]),
-    copts = COPTS,
-    visibility = ["//visibility:public"],
-    deps = [
-        "//curvefs/src/metaserver:metaserver",
-    ],
-)
-
-

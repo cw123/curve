@@ -44,8 +44,10 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
             "//external:brpc",
+            "//curvefs/proto:metaserver_cc_proto",
             "//curvefs/proto:mds_cc_proto",
             "//curvefs/proto:space_cc_proto",
+            "//curvefs/src/common:curvefs_common",
             "//src/common/concurrent:curve_concurrent",
             "//src/common:curve_common",
     ],

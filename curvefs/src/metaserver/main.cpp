@@ -27,7 +27,7 @@
 
 #include "curvefs/src/metaserver/metaserver.h"
 
-DEFINE_string(confPath, "curvefs/conf/curvefsmetaserver.conf",
+DEFINE_string(confPath, "curvefs/conf/metaserver.conf",
                         "metaserver confPath");
 DEFINE_string(metaserverAddr, "127.0.0.1:6701", "metaserver listen addr");
 
@@ -42,6 +42,8 @@ void LoadConfigFromCmdline(Configuration *conf) {
 int main(int argc, char **argv) {
     // config initialization
     google::ParseCommandLineFlags(&argc, &argv, false);
+    // initialize logging module
+    google::InitGoogleLogging(argv[0]);
 
     std::string confPath = FLAGS_confPath.c_str();
     auto conf = std::make_shared<Configuration>();
@@ -56,9 +58,6 @@ int main(int argc, char **argv) {
                          << ", will log to /tmp";
         }
     }
-
-    // initialize logging module
-    google::InitGoogleLogging(argv[0]);
 
     curvefs::metaserver::Metaserver metaserver;
     // initialize metaserver options

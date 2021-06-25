@@ -56,7 +56,8 @@ cc_test(
     ],
 )
 
-cc_binary(
+
+cc_test(
     name = "fuse_client_test",
     srcs = glob([
         "*.cpp",

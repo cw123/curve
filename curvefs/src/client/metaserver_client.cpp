@@ -50,6 +50,13 @@ MetaServerClientImpl::Init(const MetaServerOption &metaopt,
     return CURVEFS_ERROR::OK;
 }
 
+CURVEFS_ERROR MetaServerClientImpl::Uinit() {
+    if (basecli_ != nullptr) {
+        delete basecli_;
+    }
+    return CURVEFS_ERROR::OK;
+}
+
 
 #define RPCTaskDefine                                                          \
     [&](brpc::Channel * channel, brpc::Controller * cntl) -> int
@@ -294,6 +301,9 @@ void MetaServerClientImpl::MetaServerStatusCode2CurveFSErr(
         break;
     case MetaStatusCode::PARAM_ERROR:
         *errcode = CURVEFS_ERROR::INVALIDPARAM;
+        break;
+    case MetaStatusCode::NOT_FOUND:
+        *errcode = CURVEFS_ERROR::NOTEXIST;
         break;
     default:
         *errcode = CURVEFS_ERROR::UNKNOWN;
