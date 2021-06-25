@@ -28,8 +28,7 @@ namespace space {
 
 class MockSpaceManager : public SpaceManager {
  public:
-    MOCK_METHOD4(InitSpace,
-                 SpaceStatusCode(uint32_t, uint64_t, uint64_t, uint64_t));
+    MOCK_METHOD1(InitSpace, SpaceStatusCode(const mds::FsInfo&));
     MOCK_METHOD1(UnInitSpace, SpaceStatusCode(uint32_t));
     MOCK_METHOD4(StatSpace,
                  SpaceStatusCode(uint32_t, uint64_t*, uint64_t*, uint64_t*));
@@ -40,6 +39,7 @@ class MockSpaceManager : public SpaceManager {
                  SpaceStatusCode(uint32_t,
                                  const ::google::protobuf::RepeatedPtrField<
                                      ::curvefs::space::Extent>&));
+    MOCK_METHOD2(AllocateS3Chunk, SpaceStatusCode(uint32_t, uint64_t*));
 };
 
 }  // namespace space

@@ -71,6 +71,7 @@ TEST_F(SpaceAllocServiceTest, TestInitSpace) {
         auto* fsInfo = request.mutable_fsinfo();
         fsInfo->set_fsid(100);
         fsInfo->set_fsname("TestInitSpace");
+        fsInfo->set_status(mds::FsStatus::NEW);
         fsInfo->set_rootinodeid(0);
         fsInfo->set_capacity(100 * kGiB);
         fsInfo->set_blocksize(4 * kKiB);
@@ -80,15 +81,16 @@ TEST_F(SpaceAllocServiceTest, TestInitSpace) {
         volume->set_volumename("TestInitSpaceVolume");
         volume->set_user("test");
         fsInfo->set_mountnum(1);
+        fsInfo->set_fstype(mds::FSType::TYPE_VOLUME);
 
-        EXPECT_CALL(space_, InitSpace(_, _, _, _))
+        EXPECT_CALL(space_, InitSpace(_))
             .WillOnce(Return(SPACE_RELOAD_ERROR));
 
         brpc::Controller cntl;
         SpaceAllocService_Stub stub(&channel_);
         stub.InitSpace(&cntl, &request, &response, nullptr);
 
-        EXPECT_FALSE(cntl.Failed());
+        EXPECT_FALSE(cntl.Failed()) << cntl.ErrorText();
         EXPECT_EQ(SPACE_RELOAD_ERROR, response.status());
     }
 
@@ -99,6 +101,7 @@ TEST_F(SpaceAllocServiceTest, TestInitSpace) {
         auto* fsInfo = request.mutable_fsinfo();
         fsInfo->set_fsid(100);
         fsInfo->set_fsname("TestInitSpace");
+        fsInfo->set_status(mds::FsStatus::NEW);
         fsInfo->set_rootinodeid(0);
         fsInfo->set_capacity(100 * kGiB);
         fsInfo->set_blocksize(4 * kKiB);
@@ -108,8 +111,9 @@ TEST_F(SpaceAllocServiceTest, TestInitSpace) {
         volume->set_volumename("TestInitSpaceVolume");
         volume->set_user("test");
         fsInfo->set_mountnum(1);
+        fsInfo->set_fstype(mds::FSType::TYPE_VOLUME);
 
-        EXPECT_CALL(space_, InitSpace(_, _, _, _))
+        EXPECT_CALL(space_, InitSpace(_))
             .WillOnce(Return(SPACE_OK));
 
         brpc::Controller cntl;

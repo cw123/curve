@@ -25,8 +25,14 @@
 
 #include "curvefs/src/space_allocator/bitmap_allocator.h"
 #include "curvefs/src/space_allocator/rw_lock.h"
+#include "curvefs/src/space_allocator/s3_allocator.h"
 
 namespace curvefs {
+
+namespace mds {
+class FsInfo;
+}
+
 namespace space {
 
 struct SpaceManagerOption {};
@@ -36,9 +42,7 @@ class SpaceManager {
     SpaceManager() = default;
     virtual ~SpaceManager() = default;
 
-    virtual SpaceStatusCode InitSpace(uint32_t fsId, uint64_t volSize,
-                                      uint64_t blkSize,
-                                      uint64_t rootInodeId) = 0;
+    virtual SpaceStatusCode InitSpace(const mds::FsInfo& fsInfo) = 0;
 
     virtual SpaceStatusCode UnInitSpace(uint32_t fsId) = 0;
 
@@ -55,6 +59,8 @@ class SpaceManager {
         const ::google::protobuf::RepeatedPtrField<::curvefs::space::Extent>&
             extents) = 0;
 
+    virtual SpaceStatusCode AllocateS3Chunk(uint32_t fsId, uint64_t* id) = 0;
+
  private:
     SpaceManager(const SpaceManager&);
     SpaceManager& operator=(const SpaceManager&);
@@ -64,8 +70,7 @@ class DefaultSpaceManager : public SpaceManager {
  public:
     explicit DefaultSpaceManager(const SpaceManagerOption& opt);
 
-    SpaceStatusCode InitSpace(uint32_t fsId, uint64_t volSize, uint64_t blkSize,
-                              uint64_t rootInodeId);
+    SpaceStatusCode InitSpace(const mds::FsInfo& fsInfo);
 
     SpaceStatusCode UnInitSpace(uint32_t fsId);
 
@@ -81,10 +86,20 @@ class DefaultSpaceManager : public SpaceManager {
         const ::google::protobuf::RepeatedPtrField<::curvefs::space::Extent>&
             extents);
 
+    SpaceStatusCode AllocateS3Chunk(uint32_t fsId, uint64_t* id) override;
+
+ private:
+    SpaceStatusCode InitS3Space(const mds::FsInfo& fsInfo);
+
+    SpaceStatusCode InitBlockSpace(const mds::FsInfo& fsInfo);
+
  private:
     SpaceManagerOption opt_;
-    BthreadRWLock rwlock_;
-    std::unordered_map<int, std::unique_ptr<BitmapAllocator>> allocators_;
+    BthreadRWLock blkRwlock_;
+    std::unordered_map<int, std::unique_ptr<BitmapAllocator>> blkAllocators_;
+
+    BthreadRWLock s3Rwlock_;
+    std::unordered_map<int, std::unique_ptr<S3Allocator>> s3Allocator_;
 };
 
 }  // namespace space
