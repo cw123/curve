@@ -35,12 +35,7 @@ void SpaceAllocServiceImpl::InitSpace(
     brpc::ClosureGuard guard(done);
     brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
 
-    auto status =
-        space_->InitSpace(
-            request->fsinfo().fsid(),
-            request->fsinfo().capacity(),
-            request->fsinfo().blocksize(),
-            request->fsinfo().rootinodeid());
+    auto status = space_->InitSpace(request->fsinfo());
 
     response->set_status(status);
     if (status != SPACE_OK) {
@@ -151,6 +146,29 @@ void SpaceAllocServiceImpl::StatSpace(
         response->set_totalblock(total / blkSize);
         response->set_availableblock(available / blkSize);
         response->set_usedblock((total - available) / blkSize);
+    }
+}
+
+void SpaceAllocServiceImpl::AllocateS3Chunk(
+    ::google::protobuf::RpcController* controller,
+    const ::curvefs::space::AllocateS3ChunkRequest* request,
+    ::curvefs::space::AllocateS3ChunkResponse* response,
+    ::google::protobuf::Closure* done) {
+    brpc::ClosureGuard guard(done);
+
+    uint64_t id = 0;
+
+    auto status = space_->AllocateS3Chunk(request->fsid(), &id);
+    response->set_status(status);
+    if (status != SPACE_OK) {
+        LOG(ERROR) << "AllocateS3Chunk failure, request: "
+                   << request->ShortDebugString()
+                   << ", error: " << SpaceStatusCode_Name(status);
+    } else {
+        response->set_chunkid(id);
+        LOG(INFO) << "AllocateS3Chunk success, request: "
+                  << request->ShortDebugString()
+                  << ", response: " << response->ShortDebugString();
     }
 }
 

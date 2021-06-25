@@ -55,6 +55,12 @@ class SpaceAllocServiceImpl : public curvefs::space::SpaceAllocService {
                    ::curvefs::space::StatSpaceResponse* response,
                    ::google::protobuf::Closure* done) override;
 
+    void AllocateS3Chunk(
+        ::google::protobuf::RpcController* controller,
+        const ::curvefs::space::AllocateS3ChunkRequest* request,
+        ::curvefs::space::AllocateS3ChunkResponse* response,
+        ::google::protobuf::Closure* done) override;
+
  private:
     static SpaceAllocateHint ToSpaceAllocateHint(const AllocateHint& hint);
 

@@ -17,12 +17,12 @@
 #include "curvefs/src/space_allocator/space_manager.h"
 
 #include <glog/logging.h>
-#include <vector>
 
 #include <utility>
+#include <vector>
 
+#include "curvefs/proto/mds.pb.h"
 #include "curvefs/proto/space.pb.h"
-
 #include "curvefs/src/space_allocator/reloader.h"
 
 namespace curvefs {
@@ -30,54 +30,31 @@ namespace space {
 
 DEFINE_bool(enableReload, false, "enable reload extents");
 
-SpaceStatusCode DefaultSpaceManager::InitSpace(uint32_t fsId, uint64_t volSize,
-                                        uint64_t blkSize,
-                                        uint64_t rootInodeId) {
-    WriteLockGuard lock(rwlock_);
-    if (allocators_.count(fsId) != 0) {
-        LOG(ERROR) << "allocator already exists, fsId: " << fsId;
-        return SPACE_EXISTS;
+SpaceStatusCode DefaultSpaceManager::InitSpace(const mds::FsInfo& fsInfo) {
+    if (fsInfo.fstype() == mds::FSType::TYPE_S3) {
+        return InitS3Space(fsInfo);
+    } else {
+        return InitBlockSpace(fsInfo);
     }
-
-    BitmapAllocatorOption opt;
-    opt.length = volSize;
-    opt.sizePerBit = 4 * kMiB;
-    opt.startOffset = 0;
-    opt.smallAllocProportion = 0.2;
-
-    std::unique_ptr<BitmapAllocator> allocator(new BitmapAllocator(opt));
-
-    if (FLAGS_enableReload) {
-        DefaultRealoder reloader(allocator.get(), fsId, rootInodeId);
-        if (reloader.Reload() == false) {
-            LOG(ERROR) << "reload extents failed";
-            return SPACE_RELOAD_ERROR;
-        }
-    }
-
-    allocators_.emplace(fsId, std::move(allocator));
-    LOG(INFO) << "Init allocator success, fsId: " << fsId
-              << "volume size: " << volSize << ", block size: " << blkSize;
-    return SPACE_OK;
 }
 
 SpaceStatusCode DefaultSpaceManager::UnInitSpace(uint32_t fsId) {
-    WriteLockGuard lock(rwlock_);
-    auto iter = allocators_.find(fsId);
-    if (iter == allocators_.end()) {
+    WriteLockGuard lock(blkRwlock_);
+    auto iter = blkAllocators_.find(fsId);
+    if (iter == blkAllocators_.end()) {
         return SPACE_NOT_FOUND;
     }
 
-    allocators_.erase(iter);
+    blkAllocators_.erase(iter);
     return SPACE_OK;
 }
 
 SpaceStatusCode DefaultSpaceManager::StatSpace(uint32_t fsId, uint64_t* total,
-                                        uint64_t* available,
-                                        uint64_t* blkSize) {
-    ReadLockGuard lock(rwlock_);
-    auto iter = allocators_.find(fsId);
-    if (iter == allocators_.end()) {
+                                               uint64_t* available,
+                                               uint64_t* blkSize) {
+    ReadLockGuard lock(blkRwlock_);
+    auto iter = blkAllocators_.find(fsId);
+    if (iter == blkAllocators_.end()) {
         return SPACE_NOT_FOUND;
     }
 
@@ -86,12 +63,12 @@ SpaceStatusCode DefaultSpaceManager::StatSpace(uint32_t fsId, uint64_t* total,
     return SPACE_OK;
 }
 
-SpaceStatusCode DefaultSpaceManager::AllocateSpace(uint32_t fsId, uint32_t size,
-                                            const SpaceAllocateHint& hint,
-                                            std::vector<PExtent>* exts) {
-    ReadLockGuard lock(rwlock_);
-    auto iter = allocators_.find(fsId);
-    if (iter == allocators_.end()) {
+SpaceStatusCode DefaultSpaceManager::AllocateSpace(
+    uint32_t fsId, uint32_t size, const SpaceAllocateHint& hint,
+    std::vector<PExtent>* exts) {
+    ReadLockGuard lock(blkRwlock_);
+    auto iter = blkAllocators_.find(fsId);
+    if (iter == blkAllocators_.end()) {
         return SPACE_NOT_FOUND;
     }
 
@@ -114,9 +91,9 @@ SpaceStatusCode DefaultSpaceManager::DeallocateSpace(
     uint32_t fsId,
     const ::google::protobuf::RepeatedPtrField<::curvefs::space::Extent>&
         extents) {
-    ReadLockGuard lock(rwlock_);
-    auto iter = allocators_.find(fsId);
-    if (iter == allocators_.end()) {
+    ReadLockGuard lock(blkRwlock_);
+    auto iter = blkAllocators_.find(fsId);
+    if (iter == blkAllocators_.end()) {
         return SPACE_NOT_FOUND;
     }
 
@@ -124,6 +101,61 @@ SpaceStatusCode DefaultSpaceManager::DeallocateSpace(
         iter->second->DeAlloc(e.offset(), e.length());
     }
 
+    return SPACE_OK;
+}
+
+SpaceStatusCode DefaultSpaceManager::AllocateS3Chunk(uint32_t fsId,
+                                                     uint64_t* id) {
+    ReadLockGuard lock(s3Rwlock_);
+    auto iter = s3Allocator_.find(fsId);
+    if (iter == s3Allocator_.end()) {
+        return SPACE_NOT_FOUND;
+    }
+
+    *id = iter->second->NextChunkId();
+    return SPACE_OK;
+}
+
+SpaceStatusCode DefaultSpaceManager::InitS3Space(const mds::FsInfo& fsInfo) {
+    WriteLockGuard lock(s3Rwlock_);
+    if (s3Allocator_.count(fsInfo.fsid()) != 0) {
+        LOG(ERROR) << "allocator already exists, fsId: " << fsInfo.fsid();
+        return SPACE_EXISTS;
+    }
+
+    std::unique_ptr<S3Allocator> allocator(new S3Allocator(0));
+    s3Allocator_.emplace(fsInfo.fsid(), std::move(allocator));
+    return SPACE_OK;
+}
+
+SpaceStatusCode DefaultSpaceManager::InitBlockSpace(const mds::FsInfo& fsInfo) {
+    WriteLockGuard lock(blkRwlock_);
+    if (blkAllocators_.count(fsInfo.fsid()) != 0) {
+        LOG(ERROR) << "allocator already exists, fsId: " << fsInfo.fsid();
+        return SPACE_EXISTS;
+    }
+
+    BitmapAllocatorOption opt;
+    opt.length = fsInfo.capacity();
+    opt.sizePerBit = 4 * kMiB;
+    opt.startOffset = 0;
+    opt.smallAllocProportion = 0.2;
+
+    std::unique_ptr<BitmapAllocator> allocator(new BitmapAllocator(opt));
+
+    if (FLAGS_enableReload) {
+        DefaultRealoder reloader(allocator.get(), fsInfo.fsid(),
+                                 fsInfo.rootinodeid());
+        if (reloader.Reload() == false) {
+            LOG(ERROR) << "reload extents failed";
+            return SPACE_RELOAD_ERROR;
+        }
+    }
+
+    blkAllocators_.emplace(fsInfo.fsid(), std::move(allocator));
+    LOG(INFO) << "Init allocator success, fsId: " << fsInfo.fsid()
+              << "volume size: " << fsInfo.capacity()
+              << ", block size: " << fsInfo.blocksize();
     return SPACE_OK;
 }
 
