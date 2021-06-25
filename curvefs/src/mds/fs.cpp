@@ -25,14 +25,29 @@ namespace curvefs {
 namespace mds {
 MdsFsInfo::MdsFsInfo(uint32_t fsId, std::string fsName, FsStatus status,
                     uint64_t rootInodeId, uint64_t capacity,
-                    uint64_t blockSize, const common::Volume& volume) {
+                    uint64_t blockSize, const Volume& volume) {
     fsId_ = fsId;
     fsName_ = fsName;
     status_ = status;
     rootInodeId_ = rootInodeId;
     capacity_ = capacity;
     blockSize_ = blockSize;
+    type_ = FSType::TYPE_VOLUME;
     volume_.CopyFrom(volume);
+    mountNum_ = 0;
+}
+
+MdsFsInfo::MdsFsInfo(uint32_t fsId, std::string fsName, FsStatus status,
+                    uint64_t rootInodeId, uint64_t capacity,
+                    uint64_t blockSize, const S3Info& s3Info) {
+    fsId_ = fsId;
+    fsName_ = fsName;
+    status_ = status;
+    rootInodeId_ = rootInodeId;
+    capacity_ = capacity;
+    blockSize_ = blockSize;
+    type_ = FSType::TYPE_S3;
+    s3Info_.CopyFrom(s3Info);
     mountNum_ = 0;
 }
 
@@ -45,7 +60,13 @@ void MdsFsInfo::ConvertToProto(FsInfo *file) {
     file->set_capacity(capacity_);
     file->set_blocksize(blockSize_);
     file->set_mountnum(mountNum_);
-    file->mutable_volume()->CopyFrom(volume_);
+    file->set_fstype(type_);
+    if (type_ == FSType::TYPE_VOLUME) {
+        file->mutable_volume()->CopyFrom(volume_);
+    } else {
+        file->mutable_s3info()->CopyFrom(s3Info_);
+    }
+
     *file->mutable_mountpoints() = {mountPointList_.begin(),
                                    mountPointList_.end()};
     return;

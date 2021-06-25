@@ -223,6 +223,12 @@ void MetaServerServiceImpl::UpdateInode(
     brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
     uint32_t fsId = request->fsid();
     uint64_t inodeId = request->inodeid();
+    if (request->has_volumeextentlist() && request->has_s3chunkinfolist()) {
+        LOG(ERROR) << "only one of type space info, choose volume or s3";
+        response->set_statuscode(MetaStatusCode::PARAM_ERROR);
+        return;
+    }
+
     Inode inode;
     MetaStatusCode status = inodeManager_->GetInode(fsId, inodeId, &inode);
     if (status != MetaStatusCode::OK) {
@@ -252,6 +258,12 @@ void MetaServerServiceImpl::UpdateInode(
         needUpdate = true;
     }
 
+    if (request->has_s3chunkinfolist()) {
+        LOG(INFO) << "update inode has extent";
+        inode.mutable_s3chunkinfolist()->CopyFrom(request->s3chunkinfolist());
+        needUpdate = true;
+    }
+
     if (needUpdate) {
         status = inodeManager_->UpdateInode(inode);
         response->set_statuscode(status);
@@ -276,6 +288,21 @@ void MetaServerServiceImpl::DeleteInode(
     response->set_statuscode(status);
     return;
 }
+
+void MetaServerServiceImpl::UpdateInodeS3Version(
+            ::google::protobuf::RpcController* controller,
+            const ::curvefs::metaserver::UpdateInodeS3VersionRequest* request,
+            ::curvefs::metaserver::UpdateInodeS3VersionResponse* response,
+            ::google::protobuf::Closure* done) {
+    brpc::ClosureGuard doneGuard(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    uint32_t fsId = request->fsid();
+    uint64_t inodeId = request->inodeid();
+    MetaStatusCode status = inodeManager_->UpdateInodeVersion(fsId, inodeId);
+    response->set_statuscode(status);
+    return;
+}
+
 }  // namespace metaserver
 }  // namespace curvefs
 

@@ -33,26 +33,64 @@ void MdsServiceImpl::CreateFs(::google::protobuf::RpcController* controller,
     brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
     std::string fsName = request->fsname();
     uint64_t blockSize = request->blocksize();
-    curvefs::common::Volume volume = request->volume();
-    LOG(INFO) << "CreateFs request, fsName = " << fsName
+    FSType type = request->fstype();
+    if (type == FSType::TYPE_VOLUME) {
+        if (!request->has_volume()) {
+            response->set_statuscode(FSStatusCode::PARAM_ERROR);
+            LOG(ERROR) << "CreateFs request, type is volume, but has no volume"
+                       << ", fsName = " << fsName;
+            return;
+        }
+        curvefs::common::Volume volume = request->volume();
+        LOG(INFO) << "CreateFs request, fsName = " << fsName
+                << ", blockSize = " << blockSize
+                << ", volume.volumeName = " << volume.volumename();
+        FSStatusCode status = fsManager_->CreateFs(fsName, blockSize,
+                                volume, response->mutable_fsinfo());
+        if (status != FSStatusCode::OK) {
+            response->clear_fsinfo();
+            response->set_statuscode(status);
+            LOG(ERROR) << "CreateFs fail, fsName = " << fsName
+                << ", blockSize = " << blockSize
+                << ", volume.volumeName = " << volume.volumename()
+                << ", errCode = " << FSStatusCode_Name(status);
+            return;
+        }
+    } else if (type == FSType::TYPE_S3) {
+        if (!request->has_s3info()) {
+            response->set_statuscode(FSStatusCode::PARAM_ERROR);
+            LOG(ERROR) << "CreateFs request, type is s3, but has no s3info"
+                       << ", fsName = " << fsName;
+            return;
+        }
+        curvefs::common::S3Info s3Info = request->s3info();
+        LOG(INFO) << "CreateFs request, fsName = " << fsName
+                << ", blockSize = " << blockSize
+                << ", s3Info.bucketname = " << s3Info.bucketname();
+        FSStatusCode status = fsManager_->CreateFs(fsName, blockSize,
+                                s3Info, response->mutable_fsinfo());
+        if (status != FSStatusCode::OK) {
+            response->clear_fsinfo();
+            response->set_statuscode(status);
+            LOG(ERROR) << "CreateFs fail, fsName = " << fsName
+                << ", blockSize = " << blockSize
+                << ", s3Info.bucketname = " << s3Info.bucketname()
+                << ", errCode = " << FSStatusCode_Name(status);
+            return;
+        }
+    } else {
+        response->set_statuscode(FSStatusCode::PARAM_ERROR);
+        LOG(ERROR) << "CreateFs fail, fs type is invalid"
+              << ", fsName = " << fsName
               << ", blockSize = " << blockSize
-              << ", volume.volumeName = " << volume.volumename();
-    FSStatusCode status = fsManager_->CreateFs(fsName, blockSize, volume,
-                            response->mutable_fsinfo());
-    if (status != FSStatusCode::OK) {
-        response->clear_fsinfo();
-        response->set_statuscode(status);
-        LOG(ERROR) << "CreateFs fail, fsName = " << fsName
-              << ", blockSize = " << blockSize
-              << ", volume.volumeName = " << volume.volumename()
-              << ", errCode = " << FSStatusCode_Name(status);
+              << ", fsType = " << type
+              << ", errCode = " << FSStatusCode_Name(FSStatusCode::PARAM_ERROR);
         return;
     }
 
     response->set_statuscode(FSStatusCode::OK);
     LOG(INFO) << "CreateFs success, fsName = " << fsName
-              << ", blockSize = " << blockSize
-              << ", volume.volumeName = " << volume.volumename();
+              << ", blockSize = " << blockSize;
     return;
 }
 
