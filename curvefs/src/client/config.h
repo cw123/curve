@@ -27,8 +27,10 @@
 
 #include <string>
 #include "src/common/configuration.h"
+#include "src/common/s3_adapter.h"
 
 using ::curve::common::Configuration;
+using ::curve::common::S3AdapterOption;
 
 namespace curvefs {
 namespace client {
@@ -54,14 +56,19 @@ struct SpaceAllocServerOption {
     uint64_t rpcTimeoutMs;
 };
 
+struct S3Option {
+    uint64_t blocksize;
+    uint64_t chunksize;
+    S3AdapterOption s3AdaptrOpt;
+};
 
 struct FuseClientOption {
     MdsOption mdsOpt;
     MetaServerOption metaOpt;
     SpaceAllocServerOption spaceOpt;
     BlockDeviceClientOptions bdevOpt;
+    S3Option s3Opt;
 };
-
 
 void InitFuseClientOption(Configuration *conf,
     FuseClientOption *clientOption);

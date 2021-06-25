@@ -36,6 +36,10 @@
 #include "curvefs/src/client/extent_manager.h"
 #include "curvefs/src/client/space_client.h"
 #include "curvefs/src/client/config.h"
+#include "curvefs/src/client/s3/client_s3_adaptor.h"
+#include "curvefs/proto/common.pb.h"
+
+using ::curvefs::common::FSType;
 
 namespace curvefs {
 namespace client {
@@ -46,6 +50,7 @@ class FuseClient {
         std::shared_ptr<MetaServerClient> metaClient,
         std::shared_ptr<SpaceClient> spaceClient,
         std::shared_ptr<BlockDeviceClient> blockDeviceClient,
+        std::shared_ptr<S3ClientAdaptor> s3Adaptor,
         std::shared_ptr<InodeCacheManager> inodeManager,
         std::shared_ptr<DentryCacheManager> dentryManager,
         std::shared_ptr<ExtentManager> extManager,
@@ -54,11 +59,18 @@ class FuseClient {
             metaClient_(metaClient),
             spaceClient_(spaceClient),
             blockDeviceClient_(blockDeviceClient),
+            s3Adaptor_(s3Adaptor),
             inodeManager_(inodeManager),
             dentryManager_(dentryManager),
             extManager_(extManager),
             dirBuf_(dirBuf),
-            fsInfo_(nullptr) {}
+            fsInfo_(nullptr),
+            fsType_(FSType::TYPE_VOLUME) {}
+
+    CURVEFS_ERROR Init(const FuseClientOption &option) {
+        option_ = option;
+        return CURVEFS_ERROR::OK;
+    }
 
     void init(void *userdata, struct fuse_conn_info *conn);
 
@@ -118,6 +130,10 @@ class FuseClient {
         return fsInfo_;
     }
 
+    void SetFsType(FSType fsType) {
+        fsType_ = fsType;
+    }
+
  private:
     void GetDentryParamFromInode(const Inode &inode, fuse_entry_param *param);
 
@@ -145,6 +161,9 @@ class FuseClient {
     // curve client
     std::shared_ptr<BlockDeviceClient> blockDeviceClient_;
 
+    // s3 client
+    std::shared_ptr<S3ClientAdaptor> s3Adaptor_;
+
     // inode cache manager
     std::shared_ptr<InodeCacheManager> inodeManager_;
 
@@ -159,6 +178,10 @@ class FuseClient {
 
     // filesystem info
     std::shared_ptr<FsInfo> fsInfo_;
+
+    FuseClientOption option_;
+
+    FSType fsType_;
 };
 
 }  // namespace client

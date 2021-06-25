@@ -60,7 +60,7 @@ class S3ClientAdaptor {
      * @brief Initailize s3 client
      * @param[in] options the options for s3 client
      */
-    void Init(const S3ClientAdaptorOption  option, S3Client *client);
+    void Init(const  S3ClientAdaptorOption  option, S3Client *client);
     /**
      * @brief write data to s3
      * @param[in] options the options for s3 client

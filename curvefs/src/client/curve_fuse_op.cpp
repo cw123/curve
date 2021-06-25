@@ -25,6 +25,7 @@
 #include "curvefs/src/client/error_code.h"
 #include "curvefs/src/client/config.h"
 #include "src/common/configuration.h"
+#include "curvefs/src/client/s3/client_s3_adaptor.h"
 
 using ::curve::client::FileClient;
 using ::curve::common::Configuration;
@@ -85,15 +86,26 @@ int InitFuseClient(const char *confPath) {
         return (int)ret;
     }
 
+    auto s3Client = new ::curvefs::client::S3ClientImpl();
+    s3Client->Init(option.s3Opt.s3AdaptrOpt);
+    auto s3Adaptor = std::make_shared<curvefs::client::S3ClientAdaptor>();
+
+    curvefs::client::S3ClientAdaptorOption s3AdaptorOption;
+    s3AdaptorOption.blockSize = option.s3Opt.blocksize;
+    s3AdaptorOption.chunkSize = option.s3Opt.chunksize;
+    s3AdaptorOption.metaServerEps = option.metaOpt.msaddr;
+    s3AdaptorOption.allocateServerEps = option.spaceOpt.spaceaddr;
+    s3Adaptor->Init(s3AdaptorOption, s3Client);
+
     auto inodeManager = std::make_shared<InodeCacheManager>(metaClient);
     auto dentryManager = std::make_shared<DentryCacheManager>(metaClient);
     auto extManager = std::make_shared<SimpleExtentManager>();
     auto dirBuf = std::make_shared<DirBuffer>();
     g_ClientInstance =
         new FuseClient(mdsClient, metaClient, spaceClient, blockDeviceClient,
-                       inodeManager, dentryManager, extManager, dirBuf);
+            s3Adaptor, inodeManager, dentryManager, extManager, dirBuf);
 
-    return 0;
+    return (int)g_ClientInstance->Init(option);
 }
 
 void UnInitFuseClient() { delete g_ClientInstance; }
