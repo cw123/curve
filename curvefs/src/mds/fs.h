@@ -31,7 +31,8 @@ using curve::common::ReadLockGuard;
 using curve::common::WriteLockGuard;
 using curve::common::RWLock;
 using curvefs::common::Volume;
-
+using curvefs::common::FSType;
+using curvefs::common::S3Info;
 namespace curvefs {
 namespace mds {
 class MdsFsInfo {
@@ -39,8 +40,11 @@ class MdsFsInfo {
     MdsFsInfo() {}
     MdsFsInfo(uint32_t fsId, std::string fsName, FsStatus status,
          uint64_t rootInodeId, uint64_t capacity, uint64_t blockSize,
-         const common::Volume& volume);
+         const Volume& volume);
 
+    MdsFsInfo(uint32_t fsId, std::string fsName, FsStatus status,
+         uint64_t rootInodeId, uint64_t capacity, uint64_t blockSize,
+         const S3Info& s3Info);
     /**
      * @brief convert MdsFsInfo to FsInfo
      *
@@ -94,6 +98,8 @@ class MdsFsInfo {
     uint64_t rootInodeId_;
     uint64_t capacity_;
     uint64_t blockSize_;
+    FSType type_;
+    S3Info s3Info_;
     Volume volume_;
     uint32_t mountNum_;
     std::list<MountPoint> mountPointList_;

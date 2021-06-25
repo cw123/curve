@@ -57,7 +57,21 @@ class FsManager {
      *         else return error code
      */
     FSStatusCode CreateFs(std::string fsName, uint64_t blockSize,
-                  curvefs::common::Volume volume, FsInfo* fsInfo);
+                  Volume volume, FsInfo* fsInfo);
+
+    /**
+     * @brief create fs, the fs name can not repeate
+     *
+     * @param[in] fsName: the fs name, can't be repeated
+     * @param[in] blockSize: space alloc must align this blockSize
+     * @param[in] s3Info: the fs alloc space for file from the s3
+     * @param[out] fsInfo: the fs created
+     *
+     * @return If success return OK; if fsName exist, return FS_EXIST;
+     *         else return error code
+     */
+    FSStatusCode CreateFs(std::string fsName, uint64_t blockSize,
+                  S3Info s3Info, FsInfo* fsInfo);
 
     /**
      * @brief delete fs, fs must unmount first

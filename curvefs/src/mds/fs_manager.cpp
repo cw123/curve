@@ -21,12 +21,13 @@
  */
 #include <glog/logging.h>
 #include <sys/stat.h>  // for S_IFDIR
+#include <limits>
 #include "curvefs/src/mds/fs_manager.h"
 #include "curvefs/src/common/define.h"
 namespace curvefs {
 namespace mds {
 FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
-                curvefs::common::Volume volume, FsInfo* fsInfo) {
+                            Volume volume, FsInfo* fsInfo) {
     // 1. query fs
     if (fsStorage_->Exist(fsName)) {
         LOG(WARNING) << "CreateFs fail, fs exist, fsName = " << fsName
@@ -36,7 +37,62 @@ FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
 
     // 2. create fs
     MdsFsInfo newFsInfo(GetNextFsId(), fsName, FsStatus::NEW, GetRootId(),
-                        volume.volumesize(), blockSize, volume);
+                            volume.volumesize(), blockSize, volume);
+
+    // 3. insert fs, fs status is NEW
+    FSStatusCode ret = fsStorage_->Insert(newFsInfo);
+    if (ret != FSStatusCode::OK) {
+        LOG(ERROR) << "CreateFs fail, insert fs fail, fsName = " << fsName
+                   << ", blockSize = " << blockSize
+                   << ", ret = " << FSStatusCode_Name(ret);
+        return ret;
+    }
+
+    // 4. use metaserver interface, insert rootinode
+    uint32_t fsId = newFsInfo.GetFsId();
+    uint32_t uid = 0;  // TODO(cw123)
+    uint32_t gid = 0;  // TODO(cw123)
+    uint32_t mode = S_IFDIR | 0777;  // TODO(cw123)
+    ret = metaserverClient_->CreateRootInode(fsId, uid, gid, mode);
+    if (ret != FSStatusCode::OK) {
+        LOG(ERROR) << "CreateFs fail, insert root inode fail"
+                   << ", fsName = " << fsName
+                   << ", blockSize = " << blockSize
+                   << ", ret = " << FSStatusCode_Name(ret);
+        // TODO(cw123): delete fsinfo
+        return ret;
+    }
+
+    // 5. update fs status to INITED
+    newFsInfo.SetStatus(FsStatus::INITED);
+    ret = fsStorage_->Update(newFsInfo);
+    if (ret != FSStatusCode::OK) {
+        LOG(ERROR) << "CreateFs fail, update fs to inited fail"
+                   << ", fsName = " << fsName
+                   << ", blockSize = " << blockSize
+                   << ", ret = " << FSStatusCode_Name(ret);
+        // TODO(cw123): delete inode
+        // TODO(cw123): delete fsinfo
+        return ret;
+    }
+
+    newFsInfo.ConvertToProto(fsInfo);
+    return FSStatusCode::OK;
+}
+
+FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
+                        S3Info s3Info, FsInfo* fsInfo) {
+    // 1. query fs
+    if (fsStorage_->Exist(fsName)) {
+        LOG(WARNING) << "CreateFs fail, fs exist, fsName = " << fsName
+                  << ", blockSize = " << blockSize;
+        return FSStatusCode::FS_EXIST;
+    }
+
+    // 2. create fs
+    uint64_t fsSize = std::numeric_limits<uint64_t>::max();
+    MdsFsInfo newFsInfo(GetNextFsId(), fsName, FsStatus::NEW, GetRootId(),
+                            fsSize, blockSize, s3Info);
 
     // 3. insert fs, fs status is NEW
     FSStatusCode ret = fsStorage_->Insert(newFsInfo);

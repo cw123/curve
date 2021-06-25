@@ -58,9 +58,12 @@ MetaStatusCode InodeManager::CreateInode(uint32_t fsId, uint64_t length,
     if (type == FsFileType::TYPE_SYM_LINK) {
         inode.set_symlink(symlink);
     }
+    if (type == FsFileType::TYPE_S3) {
+        inode.set_version(0);
+    }
     // 2. insert inode
-    MetaStatusCode status = inodeStorage_->Insert(inode);
-    if (status != MetaStatusCode::OK) {
+    MetaStatusCode ret = inodeStorage_->Insert(inode);
+    if (ret != MetaStatusCode::OK) {
         LOG(ERROR) << "CreateInode fail, fsId = " << fsId
               << ", length = " << length
               << ", uid = " << uid
@@ -68,8 +71,8 @@ MetaStatusCode InodeManager::CreateInode(uint32_t fsId, uint64_t length,
               << ", mode = " << mode
               << ", type =" << FsFileType_Name(type)
               << ", symlink = " << symlink
-              << ", ret = " << MetaStatusCode_Name(status);
-        return status;
+              << ", ret = " << MetaStatusCode_Name(ret);
+        return ret;
     }
 
     newInode->CopyFrom(inode);
@@ -83,6 +86,7 @@ MetaStatusCode InodeManager::CreateInode(uint32_t fsId, uint64_t length,
 
     return MetaStatusCode::OK;
 }
+
 MetaStatusCode InodeManager::CreateRootInode(uint32_t fsId, uint32_t uid,
                                 uint32_t gid, uint32_t mode) {
     LOG(INFO) << "CreateRootInode, fsId = " << fsId
@@ -105,14 +109,14 @@ MetaStatusCode InodeManager::CreateRootInode(uint32_t fsId, uint32_t uid,
     inode.set_nlink(0);  // TODO(cw123): nlink now is all 0
 
     // 2. insert inode
-    MetaStatusCode status = inodeStorage_->Insert(inode);
-    if (status != MetaStatusCode::OK) {
+    MetaStatusCode ret = inodeStorage_->Insert(inode);
+    if (ret != MetaStatusCode::OK) {
         LOG(ERROR) << "CreateRootInode fail, fsId = " << fsId
               << ", uid = " << uid
               << ", gid = " << gid
               << ", mode = " << mode
-              << ", ret = " << MetaStatusCode_Name(status);
-        return status;
+              << ", ret = " << MetaStatusCode_Name(ret);
+        return ret;
     }
 
     LOG(INFO) << "CreateRootInode success, inode: " << inode.DebugString();
@@ -127,32 +131,13 @@ MetaStatusCode InodeManager::GetInode(uint32_t fsId, uint64_t inodeId,
                                         Inode *inode) {
     LOG(INFO) << "GetInode, fsId = " << fsId
               << ", inodeId = " << inodeId;
-
-    // if (inodeId == 1) {
-    //     inode->set_inodeid(1);
-    //     inode->set_fsid(fsId);
-    //     inode->set_length(0);
-    //     inode->set_uid(0);
-    //     inode->set_gid(0);
-    //     inode->set_mode(S_IFDIR | 0777);
-    //     inode->set_type(FsFileType::TYPE_DIRECTORY);
-    //     inode->set_mtime(curve::common::TimeUtility::GetTimeofDayMs());
-    //     inode->set_atime(curve::common::TimeUtility::GetTimeofDayMs());
-    //     inode->set_ctime(curve::common::TimeUtility::GetTimeofDayMs());
-    //     inode->set_nlink(0);
-    //     LOG(INFO) << "GetInode rootinode success, fsId = " << fsId
-    //               << ", inodeId = " << inodeId
-    //               << ", " << inode->DebugString();
-    //     return MetaStatusCode::OK;
-    // }
-
-    MetaStatusCode status = inodeStorage_->Get(InodeKey(fsId, inodeId),
+    MetaStatusCode ret = inodeStorage_->Get(InodeKey(fsId, inodeId),
                                     inode);
-    if (status != MetaStatusCode::OK) {
+    if (ret != MetaStatusCode::OK) {
         LOG(ERROR) << "GetInode fail, fsId = " << fsId
               << ", inodeId = " << inodeId
-              << ", ret = " << MetaStatusCode_Name(status);
-        return status;
+              << ", ret = " << MetaStatusCode_Name(ret);
+        return ret;
     }
 
     LOG(INFO) << "GetInode success, fsId = " << fsId
@@ -165,12 +150,12 @@ MetaStatusCode InodeManager::GetInode(uint32_t fsId, uint64_t inodeId,
 MetaStatusCode InodeManager::DeleteInode(uint32_t fsId, uint64_t inodeId) {
     LOG(INFO) << "DeleteInode, fsId = " << fsId
               << ", inodeId = " << inodeId;
-    MetaStatusCode status = inodeStorage_->Delete(InodeKey(fsId, inodeId));
-    if (status != MetaStatusCode::OK) {
+    MetaStatusCode ret = inodeStorage_->Delete(InodeKey(fsId, inodeId));
+    if (ret != MetaStatusCode::OK) {
         LOG(ERROR) << "DeleteInode fail, fsId = " << fsId
               << ", inodeId = " << inodeId
-              << ", ret = " << MetaStatusCode_Name(status);
-        return status;
+              << ", ret = " << MetaStatusCode_Name(ret);
+        return ret;
     }
 
     LOG(INFO) << "DeleteInode success, fsId = " << fsId
@@ -180,14 +165,52 @@ MetaStatusCode InodeManager::DeleteInode(uint32_t fsId, uint64_t inodeId) {
 
 MetaStatusCode InodeManager::UpdateInode(const Inode &inode) {
     LOG(INFO) << "UpdateInode, " << inode.DebugString();
-    MetaStatusCode status = inodeStorage_->Update(inode);
-    if (status != MetaStatusCode::OK) {
+    MetaStatusCode ret = inodeStorage_->Update(inode);
+    if (ret != MetaStatusCode::OK) {
         LOG(ERROR) << "UpdateInode fail, " << inode.DebugString()
-                  << ", ret = " << MetaStatusCode_Name(status);
-        return status;
+                  << ", ret = " << MetaStatusCode_Name(ret);
+        return ret;
     }
 
     LOG(INFO) << "UpdateInode success, " << inode.DebugString();
+    return MetaStatusCode::OK;
+}
+
+MetaStatusCode InodeManager::UpdateInodeVersion(uint32_t fsId,
+                                    uint64_t inodeId) {
+    LOG(INFO) << "UpdateInodeVersion, fsId = " << fsId
+              << ", inodeId = " << inodeId;
+    Inode inode;
+    MetaStatusCode ret = inodeStorage_->Get(InodeKey(fsId, inodeId),
+                                    &inode);
+    if (ret != MetaStatusCode::OK) {
+        LOG(ERROR) << "UpdateInodeVersion, get inode fail fsId = " << fsId
+                   << ", inodeId = " << inodeId
+                   << ", ret = " << MetaStatusCode_Name(ret);
+        return ret;
+    }
+
+    if (inode.type() != FsFileType::TYPE_S3) {
+        ret = MetaStatusCode::PARAM_ERROR;
+        LOG(ERROR) << "UpdateInodeVersion, file type is not s3, fsId = " << fsId
+                   << ", inodeId = " << inodeId
+                   << ", ret = "
+                   << MetaStatusCode_Name(ret);
+        return ret;
+    }
+
+    inode.set_version(inode.version() + 1);
+
+    ret = inodeStorage_->Update(inode);
+    if (ret != MetaStatusCode::OK) {
+        LOG(ERROR) << "UpdateInodeVersion, update inode fail"
+                   << ", fsId = " << fsId
+                   << ", inodeId = " << inodeId
+                   << ", ret = " << MetaStatusCode_Name(ret);
+        return ret;
+    }
+
+    LOG(INFO) << "UpdateInodeVersion success, " << inode.DebugString();
     return MetaStatusCode::OK;
 }
 }  // namespace metaserver
