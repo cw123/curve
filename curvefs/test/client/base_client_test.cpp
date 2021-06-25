@@ -333,6 +333,7 @@ TEST_F(BaseClientTest, test_CreateFs) {
     vresp->set_password("test");
     fsinfo->set_allocated_volume(vresp);
     fsinfo->set_mountnum(1);
+    fsinfo->set_fstype(FSType::TYPE_VOLUME);
     auto mp = fsinfo->add_mountpoints();
     mp->set_host("0.0.0.0");
     mp->set_mountdir("/data");
@@ -437,6 +438,7 @@ TEST_F(BaseClientTest, test_GetFsInfo_by_fsName) {
     vresp->set_password("test");
     fsinfo->set_allocated_volume(vresp);
     fsinfo->set_mountnum(1);
+    fsinfo->set_fstype(FSType::TYPE_VOLUME);
     response.set_allocated_fsinfo(fsinfo);
     response.set_statuscode(curvefs::mds::FSStatusCode::OK);
     EXPECT_CALL(mockMdsService_, GetFsInfo(_, _, _, _))
@@ -474,6 +476,7 @@ TEST_F(BaseClientTest, test_GetFsInfo_by_fsId) {
     vresp->set_password("test");
     fsinfo->set_allocated_volume(vresp);
     fsinfo->set_mountnum(1);
+    fsinfo->set_fstype(FSType::TYPE_VOLUME);
     response.set_allocated_fsinfo(fsinfo);
     response.set_statuscode(curvefs::mds::FSStatusCode::OK);
     EXPECT_CALL(mockMdsService_, GetFsInfo(_, _, _, _))

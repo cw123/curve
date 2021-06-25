@@ -43,6 +43,10 @@ class MockMdsClient : public MdsClient {
         uint64_t blockSize,
         const Volume &volume));
 
+    MOCK_METHOD3(CreateFsS3, CURVEFS_ERROR(const std::string &fsName,
+        uint64_t blockSize,
+        const S3Info &s3Info));
+
     MOCK_METHOD1(DeleteFs, CURVEFS_ERROR(const std::string &fsName));
 
     MOCK_METHOD3(MountFs, CURVEFS_ERROR(const std::string &fsName,

@@ -58,6 +58,7 @@ class TestFuseClient : public ::testing::Test {
             metaClient_,
             spaceClient_,
             blockDeviceClient_,
+            nullptr,
             inodeManager_,
             dentryManager_,
             extManager_,
@@ -79,6 +80,7 @@ class TestFuseClient : public ::testing::Test {
         fsInfo->set_fsname("xxx");
 
         client_->SetFsInfo(fsInfo);
+        client_->SetFsType(FSType::TYPE_VOLUME);
         inodeManager_->SetFsId(fsId);
         dentryManager_->SetFsId(fsId);
     }
@@ -98,9 +100,11 @@ class TestFuseClient : public ::testing::Test {
 
 TEST_F(TestFuseClient, init_when_fs_exist) {
     MountOption mOpts;
+    memset(&mOpts, 0, sizeof(mOpts));
     mOpts.mountPoint = "host1:/test";
     mOpts.volume = "xxx";
     mOpts.user = "test";
+    mOpts.fsType = "curve";
 
     std::string volName = mOpts.volume;
     std::string user = mOpts.user;
@@ -130,9 +134,11 @@ TEST_F(TestFuseClient, init_when_fs_exist) {
 
 TEST_F(TestFuseClient, init_when_fs_not_exist) {
     MountOption mOpts;
+    memset(&mOpts, 0, sizeof(mOpts));
     mOpts.mountPoint = "host1:/test";
     mOpts.volume = "xxx";
     mOpts.user = "test";
+    mOpts.fsType = "curve";
 
     std::string volName = mOpts.volume;
     std::string user = mOpts.user;
@@ -168,8 +174,10 @@ TEST_F(TestFuseClient, init_when_fs_not_exist) {
 
 TEST_F(TestFuseClient, destroy) {
     MountOption mOpts;
+    memset(&mOpts, 0, sizeof(mOpts));
     mOpts.mountPoint = "host1:/test";
     mOpts.volume = "xxx";
+    mOpts.fsType = "curve";
 
     std::string fsName = mOpts.volume;
 
@@ -325,7 +333,7 @@ TEST_F(TestFuseClient, read) {
 TEST_F(TestFuseClient, open) {
     fuse_req_t req;
     fuse_ino_t ino = 1;
-    struct fuse_file_info *fi;
+    struct fuse_file_info fi;
 
     Inode inode;
     inode.set_fsid(fsId);
@@ -336,7 +344,7 @@ TEST_F(TestFuseClient, open) {
         .WillOnce(DoAll(SetArgPointee<2>(inode),
                 Return(CURVEFS_ERROR::OK)));
 
-    CURVEFS_ERROR ret = client_->open(req, ino, fi);
+    CURVEFS_ERROR ret = client_->open(req, ino, &fi);
     ASSERT_EQ(CURVEFS_ERROR::OK, ret);
 }
 
@@ -395,7 +403,7 @@ TEST_F(TestFuseClient, unlink) {
 TEST_F(TestFuseClient, opendir) {
     fuse_req_t req;
     fuse_ino_t ino = 1;
-    struct fuse_file_info *fi;
+    struct fuse_file_info fi;
 
     Inode inode;
     inode.set_fsid(fsId);
@@ -406,7 +414,7 @@ TEST_F(TestFuseClient, opendir) {
         .WillOnce(DoAll(SetArgPointee<2>(inode),
                 Return(CURVEFS_ERROR::OK)));
 
-    CURVEFS_ERROR ret = client_->opendir(req, ino, fi);
+    CURVEFS_ERROR ret = client_->opendir(req, ino, &fi);
     ASSERT_EQ(CURVEFS_ERROR::OK, ret);
 }
 

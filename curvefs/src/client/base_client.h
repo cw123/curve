@@ -58,6 +58,7 @@ using curvefs::metaserver::UpdateInodeRequest;
 using curvefs::metaserver::UpdateInodeResponse;
 
 using curvefs::common::Volume;
+using curvefs::common::S3Info;
 using curvefs::mds::CreateFsRequest;
 using curvefs::mds::CreateFsResponse;
 using curvefs::mds::DeleteFsRequest;
@@ -70,6 +71,7 @@ using curvefs::mds::MountFsResponse;
 using curvefs::mds::MountPoint;
 using curvefs::mds::UmountFsRequest;
 using curvefs::mds::UmountFsResponse;
+using curvefs::mds::FSType;
 
 using curvefs::space::AllocateSpaceRequest;
 using curvefs::space::AllocateSpaceResponse;
@@ -134,6 +136,10 @@ class MDSBaseClient {
  public:
     virtual void CreateFs(const std::string &fsName, uint64_t blockSize,
                           const Volume &volume, CreateFsResponse *response,
+                          brpc::Controller *cntl, brpc::Channel *channel);
+
+    virtual void CreateFsS3(const std::string &fsName, uint64_t blockSize,
+                          const S3Info &s3Info, CreateFsResponse *response,
                           brpc::Controller *cntl, brpc::Channel *channel);
 
     virtual void DeleteFs(const std::string &fsName, DeleteFsResponse *response,

@@ -78,6 +78,9 @@ struct S3AdapterOption {
     uint64_t bpsWriteMB;
 };
 
+void InitS3AdaptorOption(Configuration *conf,
+    S3AdapterOption *s3Opt);
+
 typedef std::function<void(const S3Adapter*,
     const std::shared_ptr<GetObjectAsyncContext>&)>
         GetObjectAsyncCallBack;

@@ -31,6 +31,7 @@
 #include "src/common/timeutility.h"
 
 using ::curvefs::common::Volume;
+using ::curvefs::common::S3Info;
 using ::curvefs::mds::MountPoint;
 
 namespace curvefs {
@@ -52,10 +53,16 @@ CURVEFS_ERROR FuseClient::GetMointPoint(
 
 void FuseClient::init(void *userdata, struct fuse_conn_info *conn) {
     struct MountOption *mOpts = (struct MountOption *) userdata;
-    std::string volName = mOpts->volume;
-    std::string fsName = mOpts->volume;
-    std::string user = mOpts->user;
-    std::string mountPointStr = mOpts->mountPoint;
+    std::string mountPointStr =
+        (mOpts->mountPoint == nullptr) ? "" : mOpts->mountPoint;
+    std::string fsTypeStr = (mOpts->fsType == nullptr) ? "" : mOpts->fsType;
+    std::string fsName = (mOpts->fsName == nullptr) ? "" : mOpts->fsName;
+    std::string volName = (mOpts->volume == nullptr) ? "" : mOpts->volume;
+    std::string user = (mOpts->user == nullptr) ? "" : mOpts->user;
+
+    if (fsName.empty()) {
+        fsName = volName;
+    }
 
     FsInfo fsInfo;
     CURVEFS_ERROR ret = mdsClient_->GetFsInfo(fsName, &fsInfo);
@@ -64,23 +71,36 @@ void FuseClient::init(void *userdata, struct fuse_conn_info *conn) {
             LOG(INFO) << "The fsName not exist, try to CreateFs"
                       << ", fsName = " << fsName;
 
-            BlockDeviceStat stat;
-            ret = blockDeviceClient_->Stat(volName, user, &stat);
-            if (ret != CURVEFS_ERROR::OK) {
-                LOG(ERROR) << "Stat volume failed, ret = " << ret
-                           << ", volName = " << volName
-                           << ", user = " << user;
-                return;
+            if (fsTypeStr == "s3") {
+                fsType_ = FSType::TYPE_S3;
+                S3Info s3Info;
+                s3Info.set_ak(option_.s3Opt.s3AdaptrOpt.ak);
+                s3Info.set_sk(option_.s3Opt.s3AdaptrOpt.sk);
+                s3Info.set_endpoint(option_.s3Opt.s3AdaptrOpt.s3Address);
+                s3Info.set_bucketname(option_.s3Opt.s3AdaptrOpt.bucketName);
+                s3Info.set_blocksize(option_.s3Opt.blocksize);
+                s3Info.set_chunksize(option_.s3Opt.chunksize);
+                ret = mdsClient_->CreateFsS3(fsName, 4096, s3Info);
+            } else {
+                BlockDeviceStat stat;
+                ret = blockDeviceClient_->Stat(volName, user, &stat);
+                if (ret != CURVEFS_ERROR::OK) {
+                    LOG(ERROR) << "Stat volume failed, ret = " << ret
+                               << ", volName = " << volName
+                               << ", user = " << user;
+                    return;
+                }
+
+                Volume vol;
+                vol.set_volumesize(stat.length);
+                // TODO(xuchaojie) : where to get block size?
+                vol.set_blocksize(4096);
+                vol.set_volumename(volName);
+                vol.set_user(user);
+
+                ret = mdsClient_->CreateFs(fsName, 4096, vol);
             }
 
-            Volume vol;
-            vol.set_volumesize(stat.length);
-            // TODO(xuchaojie) : where to get block size?
-            vol.set_blocksize(4096);
-            vol.set_volumename(volName);
-            vol.set_user(user);
-
-            ret = mdsClient_->CreateFs(fsName, 0, vol);
             if (ret != CURVEFS_ERROR::OK) {
                 LOG(ERROR) << "CreateFs failed, ret = " << ret
                            << ", fsName = " << fsName
@@ -94,12 +114,14 @@ void FuseClient::init(void *userdata, struct fuse_conn_info *conn) {
         }
     }
 
-    ret = blockDeviceClient_->Open(volName, user);
-    if (ret != CURVEFS_ERROR::OK) {
-        LOG(ERROR) << "BlockDeviceClientImpl open failed, ret = " << ret
-                   << ", volName = " << volName
-                   << ", user = " << user;
-        return;
+    if (fsType_ == FSType::TYPE_VOLUME) {
+        ret = blockDeviceClient_->Open(volName, user);
+        if (ret != CURVEFS_ERROR::OK) {
+            LOG(ERROR) << "BlockDeviceClientImpl open failed, ret = " << ret
+                       << ", volName = " << volName
+                       << ", user = " << user;
+            return;
+        }
     }
 
     MountPoint mp;
@@ -123,8 +145,9 @@ void FuseClient::init(void *userdata, struct fuse_conn_info *conn) {
 
 void FuseClient::destroy(void *userdata) {
     struct MountOption *mOpts = (struct MountOption *) userdata;
-    std::string fsName = fsInfo_->fsname();
-    std::string mountPointStr = mOpts->mountPoint;
+    std::string fsName = (mOpts->fsName == nullptr) ? "" : mOpts->fsName;
+    std::string mountPointStr =
+        (mOpts->mountPoint == nullptr) ? "" : mOpts->mountPoint;
     MountPoint mp;
     GetMointPoint(mountPointStr, &mp);
     CURVEFS_ERROR ret = mdsClient_->UmountFs(fsInfo_->fsname(),
@@ -136,10 +159,12 @@ void FuseClient::destroy(void *userdata) {
         return;
     }
 
-    ret = blockDeviceClient_->Close();
-    if (ret != CURVEFS_ERROR::OK) {
-        LOG(ERROR) << "BlockDeviceClientImpl close failed, ret = " << ret;
-        return;
+    if (fsType_ == FSType::TYPE_VOLUME) {
+        ret = blockDeviceClient_->Close();
+        if (ret != CURVEFS_ERROR::OK) {
+            LOG(ERROR) << "BlockDeviceClientImpl close failed, ret = " << ret;
+            return;
+        }
     }
 
     LOG(INFO) << "Umount " << fsName
@@ -218,67 +243,77 @@ CURVEFS_ERROR FuseClient::write(fuse_req_t req, fuse_ino_t ino, const char *buf,
                   << ", inodeid = " << ino;
         return ret;
     }
-    std::list<ExtentAllocInfo> toAllocExtents;
-    ret = extManager_->GetToAllocExtents(inode.volumeextentlist(),
-        off, size, &toAllocExtents);
-    if (toAllocExtents.size() != 0) {
-        AllocateType type = AllocateType::NONE;
-        if (inode.length() >=kBigFileSize || size >=kBigFileSize ) {
-            type = AllocateType::BIG;
-        } else {
-            type = AllocateType::SMALL;
+    if (FSType::TYPE_S3 == fsType_) {
+        *wSize = s3Adaptor_->Write(&inode, off, size, buf);
+        if (*wSize < 0) {
+            LOG(ERROR) << "s3Adaptor_ write failed, ret = " << *wSize;
+            return CURVEFS_ERROR::FAILED;
         }
-        std::list<Extent> allocatedExtents;
-        ret = spaceClient_->AllocExtents(
-            fsInfo_->fsid(), toAllocExtents, type, &allocatedExtents);
+    } else {
+        std::list<ExtentAllocInfo> toAllocExtents;
+        ret = extManager_->GetToAllocExtents(inode.volumeextentlist(),
+            off, size, &toAllocExtents);
+        if (toAllocExtents.size() != 0) {
+            AllocateType type = AllocateType::NONE;
+            if (inode.length() >=kBigFileSize || size >=kBigFileSize ) {
+                type = AllocateType::BIG;
+            } else {
+                type = AllocateType::SMALL;
+            }
+            std::list<Extent> allocatedExtents;
+            ret = spaceClient_->AllocExtents(
+                fsInfo_->fsid(), toAllocExtents, type, &allocatedExtents);
+            if (ret != CURVEFS_ERROR::OK) {
+                LOG(ERROR) << "metaClient alloc extents fail, ret = " << ret;
+                return ret;
+            }
+            ret = extManager_->MergeAllocedExtents(
+                toAllocExtents,
+                allocatedExtents,
+                inode.mutable_volumeextentlist());
+            if (ret != CURVEFS_ERROR::OK) {
+                LOG(ERROR) << "toAllocExtents and allocatedExtents not match, "
+                           << "ret = " << ret;
+                CURVEFS_ERROR ret2 = spaceClient_->DeAllocExtents(
+                    fsInfo_->fsid(), allocatedExtents);
+                if (ret2 != CURVEFS_ERROR::OK) {
+                    LOG(ERROR) << "DeAllocExtents fail, ret = " << ret;
+                }
+                return ret;
+            }
+        }
+
+        std::list<PExtent> pExtents;
+        ret = extManager_->DivideExtents(inode.volumeextentlist(),
+            off, size,
+            &pExtents);
         if (ret != CURVEFS_ERROR::OK) {
-            LOG(ERROR) << "metaClient alloc extents fail, ret = " << ret;
+            LOG(ERROR) << "DivideExtents fail, ret = " << ret;
             return ret;
         }
-        ret = extManager_->MergeAllocedExtents(
-            toAllocExtents,
-            allocatedExtents,
+
+        uint64_t writeLen = 0;
+        for (const auto &ext : pExtents) {
+            ret = blockDeviceClient_->Write(buf + writeLen,
+                ext.pOffset, ext.len);
+            writeLen += ext.len;
+            if (ret != CURVEFS_ERROR::OK) {
+                LOG(ERROR) << "block device write fail, ret = " << ret;
+                return ret;
+            }
+        }
+
+        ret = extManager_->MarkExtentsWritten(off, size, 
             inode.mutable_volumeextentlist());
         if (ret != CURVEFS_ERROR::OK) {
-            LOG(ERROR) << "toAllocExtents and allocatedExtents not match, "
-                       << "ret = " << ret;
-            CURVEFS_ERROR ret2 = spaceClient_->DeAllocExtents(
-                fsInfo_->fsid(), allocatedExtents);
-            if (ret2 != CURVEFS_ERROR::OK) {
-                LOG(ERROR) << "DeAllocExtents fail, ret = " << ret;
-            }
+            LOG(ERROR) << "MarkExtentsWritten fail, ret =  " << ret;
             return ret;
         }
-    }
-
-    std::list<PExtent> pExtents;
-    ret = extManager_->DivideExtents(inode.volumeextentlist(),
-        off, size,
-        &pExtents);
-    if (ret != CURVEFS_ERROR::OK) {
-        LOG(ERROR) << "DivideExtents fail, ret = " << ret;
-        return ret;
-    }
-
-    uint64_t writeLen = 0;
-    for (const auto &ext : pExtents) {
-        ret = blockDeviceClient_->Write(buf + writeLen,
-            ext.pOffset, ext.len);
-        writeLen += ext.len;
-        if (ret != CURVEFS_ERROR::OK) {
-            LOG(ERROR) << "block device write fail, ret = " << ret;
-            return ret;
+        // update file len
+        if (inode.length() < off + size) {
+            inode.set_length(off + size);
         }
-    }
-
-    ret = extManager_->MarkExtentsWritten(off, size, inode.mutable_volumeextentlist());
-    if (ret != CURVEFS_ERROR::OK) {
-        LOG(ERROR) << "MarkExtentsWritten fail, ret =  " << ret;
-        return ret;
-    }
-    // update file len
-    if (inode.length() < off + size) {
-        inode.set_length(off + size);
+        *wSize = size;
     }
     LOG(INFO) << "UpdateInode inode = " << inode.DebugString();
     ret = inodeManager_->UpdateInode(inode);
@@ -286,7 +321,6 @@ CURVEFS_ERROR FuseClient::write(fuse_req_t req, fuse_ino_t ino, const char *buf,
         LOG(ERROR) << "UpdateInode fail, ret = " << ret;
         return ret;
     }
-    *wSize = size;
     return ret;
 }
 
@@ -311,29 +345,41 @@ CURVEFS_ERROR FuseClient::read(fuse_req_t req,
     } else {
         len = size;
     }
-
-    std::list<PExtent> pExtents;
-    ret = extManager_->DivideExtents(inode.volumeextentlist(),
-        off, len, &pExtents);
-    if (ret != CURVEFS_ERROR::OK) {
-        LOG(ERROR) << "DivideExtents fail, ret = " << ret;
-        return ret;
-    }
     *buffer = (char*)malloc(len * sizeof(char));
     memset(*buffer, 0, len);
-    uint64_t readLen = 0;
-    for (const auto &ext : pExtents) {
-        if (!ext.UnWritten) {
-            ret = blockDeviceClient_->Read(*buffer + readLen,
-                ext.pOffset, ext.len);
-            readLen += ext.len;
-            if (ret != CURVEFS_ERROR::OK) {
-                LOG(ERROR) << "block device read fail, ret = " << ret;
-                return ret;
+
+    if (FSType::TYPE_S3 == fsType_) {
+        *rSize = s3Adaptor_->Read(&inode, off, len, *buffer);
+        LOG(ERROR) << "s3Adaptor_ write failed, ret = " << *rSize;
+        return CURVEFS_ERROR::FAILED;
+    } else {
+        std::list<PExtent> pExtents;
+        ret = extManager_->DivideExtents(inode.volumeextentlist(),
+            off, len, &pExtents);
+        if (ret != CURVEFS_ERROR::OK) {
+            LOG(ERROR) << "DivideExtents fail, ret = " << ret;
+            return ret;
+        }
+        uint64_t readLen = 0;
+        for (const auto &ext : pExtents) {
+            if (!ext.UnWritten) {
+                ret = blockDeviceClient_->Read(*buffer + readLen,
+                    ext.pOffset, ext.len);
+                readLen += ext.len;
+                if (ret != CURVEFS_ERROR::OK) {
+                    LOG(ERROR) << "block device read fail, ret = " << ret;
+                    return ret;
+                }
             }
         }
+        *rSize = len;
     }
-    *rSize = len;
+    LOG(INFO) << "UpdateInode inode = " << inode.DebugString();
+    ret = inodeManager_->UpdateInode(inode);
+    if (ret != CURVEFS_ERROR::OK) {
+        LOG(ERROR) << "UpdateInode fail, ret = " << ret;
+        return ret;
+    }
     LOG(INFO) << "read end, read size = " << *rSize;
     return ret;
 }
