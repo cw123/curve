@@ -52,6 +52,7 @@ void Mds::Init() {
 
     LOG_IF(FATAL, !spaceClient_->Init())
         << "spaceClient Init fail";
+    LOG_IF(FATAL, !metaserverClient_->Init()) << "metaserverClient Init fail";
     inited_ = true;
     LOG(INFO) << "Init MDS success";
 }

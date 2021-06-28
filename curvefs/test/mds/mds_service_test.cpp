@@ -49,10 +49,10 @@ class MdsServiceTest: public ::testing::Test {
  protected:
     void SetUp() override {
         SpaceOptions spaceOptions;
-        spaceOptions.spaceAddr = "127.0.0.1:6700";
+        spaceOptions.spaceAddr = "127.0.0.1:6703";
         spaceOptions.rpcTimeoutMs = 500;
         MetaserverOptions metaserverOptions;
-        metaserverOptions.metaserverAddr = "127.0.0.1:6700";
+        metaserverOptions.metaserverAddr = "127.0.0.1:6703";
         metaserverOptions.rpcTimeoutMs = 500;
         fsStorage_ = std::make_shared<MemoryFsStorage>();
         spaceClient_ = std::make_shared<SpaceClient>(spaceOptions);
@@ -117,7 +117,7 @@ TEST_F(MdsServiceTest, test1) {
     // start rpc server
     brpc::ServerOptions option;
     option.idle_timeout_sec = -1;
-    std::string addr = "127.0.0.1:6700";
+    std::string addr = "127.0.0.1:6703";
     ASSERT_EQ(server.Start(addr.c_str(), &option), 0);
 
 
@@ -174,6 +174,16 @@ TEST_F(MdsServiceTest, test1) {
     cntl.Reset();
     FsInfo fsinfo2;
     createRequest.set_fsname("fs2");
+    createRequest.set_fstype(FSType::TYPE_S3);
+    S3Info s3info;
+    s3info.set_ak("ak");
+    s3info.set_sk("sk");
+    s3info.set_endpoint("endpoint");
+    s3info.set_bucketname("bucketname");
+    s3info.set_blocksize(4096);
+    s3info.set_chunksize(4096);
+    createRequest.mutable_s3info()->CopyFrom(s3info);
+    createRequest.clear_volume();
     stub.CreateFs(&cntl, &createRequest, &createResponse, NULL);
     if (!cntl.Failed()) {
         ASSERT_EQ(createResponse.statuscode(), FSStatusCode::OK);
@@ -422,7 +432,8 @@ TEST_F(MdsServiceTest, test1) {
     cntl.Reset();
     stub.UmountFs(&cntl, &umountRequest, &umountResponse, NULL);
     if (!cntl.Failed()) {
-        ASSERT_EQ(umountResponse.statuscode(), FSStatusCode::NOT_FOUND);
+        ASSERT_EQ(umountResponse.statuscode(),
+                    FSStatusCode::MOUNT_POINT_NOT_EXIST);
     } else {
         LOG(ERROR) << "error = " << cntl.ErrorText();
         ASSERT_TRUE(false);

@@ -48,7 +48,7 @@ class MetaserverClient {
     // FSStatusCode CreateInode(uint32_t fsId, uint64_t length, uint32_t uid,
     //                          uint32_t gid, uint32_t mode, FsFileType type);
 
-    // FSStatusCode DeleteInode(uint32_t fsId, uint64_t inodeId);
+    FSStatusCode DeleteInode(uint32_t fsId, uint64_t inodeId);
 
     FSStatusCode CreateRootInode(uint32_t fsId,
                              uint32_t uid, uint32_t gid, uint32_t mode);

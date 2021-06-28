@@ -44,6 +44,7 @@ class MetaserverServiceTest: public ::testing::Test {
         dentryStorage_ = std::make_shared<MemoryDentryStorage>();
         inodeManager_ = std::make_shared<InodeManager>(inodeStorage_);
         dentryManager_ = std::make_shared<DentryManager>(dentryStorage_);
+        addr_ = "127.0.0.1:6702";
     }
 
     void TearDown() override {
@@ -84,6 +85,7 @@ class MetaserverServiceTest: public ::testing::Test {
         return ret;
     }
 
+    std::string addr_;
     std::shared_ptr<InodeStorage> inodeStorage_;
     std::shared_ptr<DentryStorage> dentryStorage_;
     std::shared_ptr<InodeManager> inodeManager_;
@@ -100,8 +102,7 @@ TEST_F(MetaserverServiceTest, inodeTest) {
     // start rpc server
     brpc::ServerOptions option;
     option.idle_timeout_sec = -1;
-    std::string addr = "127.0.0.1:6701";
-    ASSERT_EQ(server.Start(addr.c_str(), &option), 0);
+    ASSERT_EQ(server.Start(addr_.c_str(), &option), 0);
 
     // init client
     brpc::Channel channel;
@@ -275,8 +276,7 @@ TEST_F(MetaserverServiceTest, dentryTest) {
     // start rpc server
     brpc::ServerOptions option;
     option.idle_timeout_sec = -1;
-    std::string addr = "127.0.0.1:6701";
-    ASSERT_EQ(server.Start(addr.c_str(), &option), 0);
+    ASSERT_EQ(server.Start(addr_.c_str(), &option), 0);
 
     // init client
     brpc::Channel channel;

@@ -31,6 +31,7 @@
 #include "curvefs/src/mds/fs_storage.h"
 #include "curvefs/src/mds/space_client.h"
 #include "curvefs/src/mds/metaserver_client.h"
+#include "curvefs/src/common/define.h"
 
 namespace curvefs {
 namespace mds {
@@ -56,8 +57,8 @@ class FsManager {
      * @return If success return OK; if fsName exist, return FS_EXIST;
      *         else return error code
      */
-    FSStatusCode CreateFs(std::string fsName, uint64_t blockSize,
-                  Volume volume, FsInfo* fsInfo);
+    FSStatusCode CreateFs(const std::string& fsName, uint64_t blockSize,
+                  const Volume& volume, FsInfo* fsInfo);
 
     /**
      * @brief create fs, the fs name can not repeate
@@ -70,8 +71,8 @@ class FsManager {
      * @return If success return OK; if fsName exist, return FS_EXIST;
      *         else return error code
      */
-    FSStatusCode CreateFs(std::string fsName, uint64_t blockSize,
-                  S3Info s3Info, FsInfo* fsInfo);
+    FSStatusCode CreateFs(const std::string& fsName, uint64_t blockSize,
+                  const S3Info& s3Info, FsInfo* fsInfo);
 
     /**
      * @brief delete fs, fs must unmount first
@@ -81,7 +82,7 @@ class FsManager {
      * @return If success return OK; if fs has mount point, return FS_BUSY;
      *         else return error code
      */
-    FSStatusCode DeleteFs(std::string fsName);
+    FSStatusCode DeleteFs(const std::string& fsName);
 
     /**
      * @brief Mount fs, mount point can not repeate. It will increate mountNum.
@@ -95,8 +96,8 @@ class FsManager {
      *         if fs has same mount point, return MOUNT_POINT_EXIST;
      *         else return error code
      */
-    FSStatusCode MountFs(std::string fsName, MountPoint mountpoint,
-                           FsInfo* fsInfo);
+    FSStatusCode MountFs(const std::string& fsName,
+                         const MountPoint& mountpoint, FsInfo* fsInfo);
 
     /**
      * @brief Umount fs, it will decreate mountNum.
@@ -108,7 +109,8 @@ class FsManager {
      * @return If success return OK;
      *         else return error code
      */
-    FSStatusCode UmountFs(std::string fsName, MountPoint mountpoint);
+    FSStatusCode UmountFs(const std::string& fsName,
+                          const MountPoint& mountpoint);
 
     /**
      * @brief get fs info by fsname
@@ -118,7 +120,7 @@ class FsManager {
      *
      * @return If success return OK; else return error code
      */
-    FSStatusCode GetFsInfo(std::string fsName, FsInfo* fsInfo);
+    FSStatusCode GetFsInfo(const std::string& fsName, FsInfo* fsInfo);
 
     /**
      * @brief get fs info by fsid
@@ -139,7 +141,8 @@ class FsManager {
      *
      * @return If success return OK; else return error code
      */
-    FSStatusCode GetFsInfo(std::string fsName, uint32_t fsId, FsInfo* fsInfo);
+    FSStatusCode GetFsInfo(const std::string& fsName,
+                           uint32_t fsId, FsInfo* fsInfo);
 
  private:
     uint32_t GetNextFsId();
