@@ -85,13 +85,6 @@ int main(int argc, char *argv[]) {
         goto err_out1;
     }
 
-    if (mOpts.volume == NULL) {
-        printf("usage: %s -o volume=xxx conf=xxx [options] <mountpoint>\n\n", argv[0]);  // NOLINT
-        printf("       %s --help\n", argv[0]);
-        ret = 1;
-        goto err_out1;
-    }
-
     printf("Mount %s on volume %s ... \n", mOpts.mountPoint, mOpts.volume);
 
     ret = InitFuseClient(mOpts.conf);
