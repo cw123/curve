@@ -24,6 +24,8 @@
 
 using curvefs::metaserver::CreateRootInodeRequest;
 using curvefs::metaserver::CreateRootInodeResponse;
+using curvefs::metaserver::DeleteInodeRequest;
+using curvefs::metaserver::DeleteInodeResponse;
 using curvefs::metaserver::MetaStatusCode;
 using curvefs::metaserver::MetaServerService_Stub;
 
@@ -35,6 +37,7 @@ bool MetaserverClient::Init() {
                   << " failed!";
         return false;
     }
+    LOG(INFO) << "MetaserverClient Inited";
     inited_ = true;
     return true;
 }
@@ -61,16 +64,68 @@ FSStatusCode MetaserverClient::CreateRootInode(uint32_t fsId,
     stub.CreateRootInode(&cntl, &request, &response, nullptr);
 
     if (cntl.Failed()) {
-        LOG(ERROR) << "CreateInode failed, Rpc error = " << cntl.ErrorText();
+        LOG(ERROR) << "CreateInode failed, fsId = " << fsId
+                   << ", uid = " << uid
+                   << ", gid = " << gid
+                   << ", mode =" << mode
+                   << ", Rpc error = " << cntl.ErrorText();
         return FSStatusCode::RPC_ERROR;
     }
 
     if (response.statuscode() != MetaStatusCode::OK) {
-        LOG(ERROR) << "CreateInode failed, ret = "
-                   << FSStatusCode::INSERT_ROOT_INODE_ERROR;
+        LOG(ERROR) << "CreateInode failed, fsId = " << fsId
+                   << ", uid = " << uid
+                   << ", gid = " << gid
+                   << ", mode =" << mode
+                   << ", ret = "
+                   << FSStatusCode_Name(FSStatusCode::INSERT_ROOT_INODE_ERROR);
         return FSStatusCode::INSERT_ROOT_INODE_ERROR;
     }
     return FSStatusCode::OK;
 }
+
+FSStatusCode  MetaserverClient::DeleteInode(uint32_t fsId, uint64_t inodeId) {
+    if (!inited_) {
+        LOG(ERROR) << "MetaserverClient not Init, init first";
+        return FSStatusCode::UNKNOWN_ERROR;
+    }
+
+    DeleteInodeRequest request;
+    DeleteInodeResponse response;
+
+    brpc::Controller cntl;
+    cntl.set_timeout_ms(options_.rpcTimeoutMs);
+
+    MetaServerService_Stub stub(&channel_);
+    request.set_fsid(fsId);
+    request.set_inodeid(inodeId);
+
+    stub.DeleteInode(&cntl, &request, &response, nullptr);
+
+    if (cntl.Failed()) {
+        LOG(ERROR) << "DeleteInode failed"
+                   << ", fsId = " << fsId << ", inodeId = " << inodeId
+                   << ", Rpc error = " << cntl.ErrorText();
+        return FSStatusCode::RPC_ERROR;
+    }
+
+    if (response.statuscode() != MetaStatusCode::OK) {
+        LOG(ERROR) << "DeleteInode failed, fsId = " << fsId
+                   << ", inodeId = " << inodeId
+                   << ", ret = "
+                   << FSStatusCode_Name(FSStatusCode::DELETE_INODE_ERROR);
+        return FSStatusCode::DELETE_INODE_ERROR;
+    }
+
+    if (response.statuscode() != MetaStatusCode::OK) {
+        LOG(ERROR) << "DeleteInode failed, fsId = " << fsId
+                   << ", inodeId = " << inodeId
+                   << ", ret = "
+                   << FSStatusCode_Name(FSStatusCode::DELETE_INODE_ERROR);
+        return FSStatusCode::DELETE_INODE_ERROR;
+    }
+    return FSStatusCode::OK;
+}
+
 }  // namespace mds
 }  // namespace curvefs

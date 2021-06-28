@@ -23,11 +23,11 @@
 #include <sys/stat.h>  // for S_IFDIR
 #include <limits>
 #include "curvefs/src/mds/fs_manager.h"
-#include "curvefs/src/common/define.h"
+
 namespace curvefs {
 namespace mds {
-FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
-                            Volume volume, FsInfo* fsInfo) {
+FSStatusCode FsManager::CreateFs(const std::string& fsName, uint64_t blockSize,
+                            const Volume& volume, FsInfo* fsInfo) {
     // 1. query fs
     if (fsStorage_->Exist(fsName)) {
         LOG(WARNING) << "CreateFs fail, fs exist, fsName = " << fsName
@@ -59,7 +59,13 @@ FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
                    << ", fsName = " << fsName
                    << ", blockSize = " << blockSize
                    << ", ret = " << FSStatusCode_Name(ret);
-        // TODO(cw123): delete fsinfo
+        FSStatusCode ret2 = fsStorage_->Delete(fsName);
+        if (ret2 != FSStatusCode::OK) {
+            LOG(ERROR) << "CreateFs fail, insert root inode fail,"
+                       << " then delete fs fail, fsName = " << fsName
+                        << ", errCode = " << ret2;
+            return ret2;
+        }
         return ret;
     }
 
@@ -71,8 +77,22 @@ FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
                    << ", fsName = " << fsName
                    << ", blockSize = " << blockSize
                    << ", ret = " << FSStatusCode_Name(ret);
-        // TODO(cw123): delete inode
-        // TODO(cw123): delete fsinfo
+        ret = metaserverClient_->DeleteInode(fsId, GetRootId());
+        if (ret != FSStatusCode::OK) {
+            LOG(ERROR) << "CreateFs fail, update fs status to inited fail"
+                       << ", then delete root inode fail"
+                        << ", fsName = " << fsName
+                        << ", blockSize = " << blockSize
+                        << ", ret = " << FSStatusCode_Name(ret);
+            return ret;
+        }
+
+        ret = fsStorage_->Delete(fsName);
+        if (ret != FSStatusCode::OK) {
+            LOG(ERROR) << "CreateFs fail, insert root inode fail, "
+                       << "then delete fs fail, fsName = " << fsName
+                       << ", errCode = " << FSStatusCode_Name(ret);
+        }
         return ret;
     }
 
@@ -80,8 +100,8 @@ FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
     return FSStatusCode::OK;
 }
 
-FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
-                        S3Info s3Info, FsInfo* fsInfo) {
+FSStatusCode FsManager::CreateFs(const std::string& fsName, uint64_t blockSize,
+                        const S3Info& s3Info, FsInfo* fsInfo) {
     // 1. query fs
     if (fsStorage_->Exist(fsName)) {
         LOG(WARNING) << "CreateFs fail, fs exist, fsName = " << fsName
@@ -114,7 +134,13 @@ FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
                    << ", fsName = " << fsName
                    << ", blockSize = " << blockSize
                    << ", ret = " << FSStatusCode_Name(ret);
-        // TODO(cw123): delete fsinfo
+        FSStatusCode ret2 = fsStorage_->Delete(fsName);
+        if (ret2 != FSStatusCode::OK) {
+            LOG(ERROR) << "CreateFs fail, insert root inode fail,"
+                       << " then delete fs fail, fsName = " << fsName
+                        << ", errCode = " << ret2;
+            return ret2;
+        }
         return ret;
     }
 
@@ -126,8 +152,23 @@ FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
                    << ", fsName = " << fsName
                    << ", blockSize = " << blockSize
                    << ", ret = " << FSStatusCode_Name(ret);
-        // TODO(cw123): delete inode
-        // TODO(cw123): delete fsinfo
+        ret = metaserverClient_->DeleteInode(fsId, GetRootId());
+        if (ret != FSStatusCode::OK) {
+            LOG(ERROR) << "CreateFs fail, update fs status to inited fail"
+                       << ", then delete root inode fail"
+                        << ", fsName = " << fsName
+                        << ", blockSize = " << blockSize
+                        << ", ret = " << FSStatusCode_Name(ret);
+            return ret;
+        }
+
+        ret = fsStorage_->Delete(fsName);
+        if (ret != FSStatusCode::OK) {
+            LOG(ERROR) << "CreateFs fail, insert root inode fail, "
+                       << "then delete fs fail, fsName = " << fsName
+                       << ", errCode = " << FSStatusCode_Name(ret);
+        }
+        return ret;
         return ret;
     }
 
@@ -135,7 +176,7 @@ FSStatusCode FsManager::CreateFs(std::string fsName, uint64_t blockSize,
     return FSStatusCode::OK;
 }
 
-FSStatusCode FsManager::DeleteFs(std::string fsName) {
+FSStatusCode FsManager::DeleteFs(const std::string& fsName) {
     // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
@@ -193,7 +234,7 @@ FSStatusCode FsManager::DeleteFs(std::string fsName) {
     // 6. delete fs
     ret = fsStorage_->Delete(fsName);
     if (ret != FSStatusCode::OK) {
-        LOG(WARNING) << "DeleteFs fail, delelte fs faile, fsName = " << fsName
+        LOG(WARNING) << "DeleteFs fail, delete fs fail, fsName = " << fsName
                      << ", errCode = " << ret;
         return ret;
     }
@@ -201,8 +242,8 @@ FSStatusCode FsManager::DeleteFs(std::string fsName) {
     return FSStatusCode::OK;
 }
 
-FSStatusCode FsManager::MountFs(std::string fsName, MountPoint mountpoint,
-                        FsInfo* fsInfo) {
+FSStatusCode FsManager::MountFs(const std::string& fsName,
+                        const MountPoint& mountpoint, FsInfo* fsInfo) {
     // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
@@ -268,7 +309,8 @@ FSStatusCode FsManager::MountFs(std::string fsName, MountPoint mountpoint,
     return FSStatusCode::OK;
 }
 
-FSStatusCode FsManager::UmountFs(std::string fsName, MountPoint mountpoint) {
+FSStatusCode FsManager::UmountFs(const std::string& fsName,
+                                 const MountPoint& mountpoint) {
     // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
@@ -279,16 +321,16 @@ FSStatusCode FsManager::UmountFs(std::string fsName, MountPoint mountpoint) {
     }
 
     // 2. umount
-    ret = mdsFsInfo.DeleteMountPoint(mountpoint);
-    if (ret != FSStatusCode::OK) {
-        LOG(WARNING) << "UmountFs fail, delete mount point fail, fsName = " << fsName  // NOLINT
+    if (!mdsFsInfo.MountPointExist(mountpoint)) {
+        ret = FSStatusCode::MOUNT_POINT_NOT_EXIST;
+        LOG(WARNING) << "UmountFs fail, mount point not exist, fsName = " << fsName  // NOLINT
                   << ", errCode = " << FSStatusCode_Name(ret);
         return ret;
     }
 
-    ret = fsStorage_->Update(mdsFsInfo);
+    ret = mdsFsInfo.DeleteMountPoint(mountpoint);
     if (ret != FSStatusCode::OK) {
-        LOG(WARNING) << "UmountFs fail, update fs fail, fsName = " << fsName
+        LOG(WARNING) << "UmountFs fail, delete mount point fail, fsName = " << fsName  // NOLINT
                   << ", errCode = " << FSStatusCode_Name(ret);
         return ret;
     }
@@ -303,10 +345,18 @@ FSStatusCode FsManager::UmountFs(std::string fsName, MountPoint mountpoint) {
         }
     }
 
+    // 4. update fs info
+    ret = fsStorage_->Update(mdsFsInfo);
+    if (ret != FSStatusCode::OK) {
+        LOG(WARNING) << "UmountFs fail, update fs fail, fsName = " << fsName
+                  << ", errCode = " << FSStatusCode_Name(ret);
+        return ret;
+    }
+
     return FSStatusCode::OK;
 }
 
-FSStatusCode FsManager::GetFsInfo(std::string fsName, FsInfo* fsInfo) {
+FSStatusCode FsManager::GetFsInfo(const std::string& fsName, FsInfo* fsInfo) {
     // 1. query fs
     MdsFsInfo mdsFsInfo;
     FSStatusCode ret = fsStorage_->Get(fsName, &mdsFsInfo);
@@ -334,7 +384,7 @@ FSStatusCode FsManager::GetFsInfo(uint32_t fsId, FsInfo* fsInfo) {
     return FSStatusCode::OK;
 }
 
-FSStatusCode FsManager::GetFsInfo(std::string fsName, uint32_t fsId,
+FSStatusCode FsManager::GetFsInfo(const std::string& fsName, uint32_t fsId,
                                 FsInfo* fsInfo) {
     // 1. query fs by fsName
     MdsFsInfo mdsFsInfo;
