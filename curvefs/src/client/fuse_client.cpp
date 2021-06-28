@@ -309,11 +309,11 @@ CURVEFS_ERROR FuseClient::write(fuse_req_t req, fuse_ino_t ino, const char *buf,
             LOG(ERROR) << "MarkExtentsWritten fail, ret =  " << ret;
             return ret;
         }
-        // update file len
-        if (inode.length() < off + size) {
-            inode.set_length(off + size);
-        }
         *wSize = size;
+    }
+    // update file len
+    if (inode.length() < off + size) {
+        inode.set_length(off + size);
     }
     LOG(INFO) << "UpdateInode inode = " << inode.DebugString();
     ret = inodeManager_->UpdateInode(inode);
@@ -350,8 +350,10 @@ CURVEFS_ERROR FuseClient::read(fuse_req_t req,
 
     if (FSType::TYPE_S3 == fsType_) {
         *rSize = s3Adaptor_->Read(&inode, off, len, *buffer);
-        LOG(ERROR) << "s3Adaptor_ write failed, ret = " << *rSize;
-        return CURVEFS_ERROR::FAILED;
+        if (*rSize < 0) {
+            LOG(ERROR) << "s3Adaptor_ read failed, ret = " << *rSize;
+            return CURVEFS_ERROR::FAILED;
+        }
     } else {
         std::list<PExtent> pExtents;
         ret = extManager_->DivideExtents(inode.volumeextentlist(),
