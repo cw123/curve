@@ -311,7 +311,7 @@ CURVEFS_ERROR FuseClient::write(fuse_req_t req, fuse_ino_t ino, const char *buf,
         }
         *wSize = size;
     }
-    // update file len
+            // update file len
     if (inode.length() < off + size) {
         inode.set_length(off + size);
     }
@@ -404,14 +404,22 @@ CURVEFS_ERROR FuseClient::create(fuse_req_t req, fuse_ino_t parent,
         const char *name, mode_t mode, struct fuse_file_info *fi,
         fuse_entry_param *e) {
     LOG(INFO) << "create";
-    return MakeNode(req, parent, name, mode, FsFileType::TYPE_FILE, e);
+     if (fsType_ == FSType::TYPE_S3) {
+        return MakeNode(req, parent, name, mode, FsFileType::TYPE_S3, e);
+    } else {
+        return MakeNode(req, parent, name, mode, FsFileType::TYPE_FILE, e);    
+    }
 }
 
 CURVEFS_ERROR FuseClient::mknod(fuse_req_t req, fuse_ino_t parent,
         const char *name, mode_t mode, dev_t rdev,
         fuse_entry_param *e) {
     LOG(INFO) << "mknod";
-    return MakeNode(req, parent, name, mode, FsFileType::TYPE_FILE, e);
+    if (fsType_ == FSType::TYPE_S3) {
+        return MakeNode(req, parent, name, mode, FsFileType::TYPE_S3, e);
+    } else {
+        return MakeNode(req, parent, name, mode, FsFileType::TYPE_FILE, e);    
+    }
 }
 
 CURVEFS_ERROR FuseClient::MakeNode(fuse_req_t req, fuse_ino_t parent,

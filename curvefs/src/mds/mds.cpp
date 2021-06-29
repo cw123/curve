@@ -49,7 +49,7 @@ void Mds::Init() {
                                             options_.metaserverOptions);
     fsManager_ = std::make_shared<FsManager>(fsStorage_, spaceClient_,
                                          metaserverClient_);
-
+    LOG_IF(FATAL, !metaserverClient_->Init()) << "metaserverClient Init fail";
     LOG_IF(FATAL, !spaceClient_->Init())
         << "spaceClient Init fail";
     LOG_IF(FATAL, !metaserverClient_->Init()) << "metaserverClient Init fail";
