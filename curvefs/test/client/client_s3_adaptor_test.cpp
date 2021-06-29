@@ -140,12 +140,35 @@ TEST_F(ClientS3AdaptorTest, test_first_write) {
     delete buf;
     buf = NULL;
 }
+/*
+TEST_F(ClientS3AdaptorTest, test_over_write) {
+    curvefs::metaserver::Inode inode;
+    uint64_t fileLen = 4096;
+    InitInode(&inode);
+    inode.set_length(fileLen);
+    S3ChunkInfoList *s3ChunkInfoList = new S3ChunkInfoList();
+    S3ChunkInfo *s3ChunkInfo = s3ChunkInfoList->add_s3chunks();
+    s3ChunkInfo->set_chunkid(25);
+    s3ChunkInfo->set_version(0);
+    s3ChunkInfo->set_offset(0);
+    s3ChunkInfo->set_len(fileLen);
+    s3ChunkInfo->set_size(fileLen);
+    inode.set_allocated_s3chunkinfolist(s3ChunkInfoList);
 
+    uint64_t offset = 30;
+    uint64_t len = 30;
+    char *buf = new char[len];
+    memset(buf, 'a', len);
+
+    int ret = s3ClientAdaptor_.Write(&inode, offset, len, buf);
+}
+*/
 TEST_F(ClientS3AdaptorTest, test_read_one_chunk) {
     uint64_t readFileLen = 2 * 1024 * 1024;
     curvefs::metaserver::Inode inode;
     
     InitInode(&inode);
+    inode.set_length(readFileLen);
     S3ChunkInfoList *s3ChunkInfoList = new S3ChunkInfoList();
     S3ChunkInfo *s3ChunkInfo = s3ChunkInfoList->add_s3chunks();
     s3ChunkInfo->set_chunkid(25);

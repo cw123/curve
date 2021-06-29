@@ -29,42 +29,54 @@ void S3ClientImpl::Init(curve::common::S3AdapterOption option) {
 }
 
 int S3ClientImpl::Upload(std::string name, const char* buf, uint64_t length) {
-    std::string data;
-
+    std::string data(buf, length);
+    int ret = 0;
     const Aws::String aws_key(name.c_str(), name.size());
-    data.append(buf, 0, length);
-    return s3Adapter_.PutObject(aws_key, data);
-   
+    
+    LOG(INFO) << "upload start, aws_key:" << aws_key << ",length:" << length << ",data len:" << data.length();
+    ret = s3Adapter_.PutObject(aws_key, data);
+    LOG(INFO) << "upload end, ret:" << ret;
+    return ret;
 }
    
 int S3ClientImpl::Download(std::string name, char* buf, uint64_t offset, uint64_t length) {
     int ret = 0;
-    std::string data;
+    char *databuf = new char[length];
 
     const Aws::String aws_key(name.c_str(), name.size());
-    ret = s3Adapter_.GetObject(aws_key, &data);
-    if (ret < 0) {  
+
+    LOG(INFO) << "download start, aws_key:" << aws_key << ",offset:" << offset << ",length:" << length;
+    ret = s3Adapter_.GetObject(name, databuf, offset, length);
+    if (ret < 0) {
+        LOG(INFO) << "download error:" << ret;  
         return ret;
     }
 
-    strncpy(buf, data.c_str(), length);
-
+    strncpy(buf, databuf, length);
+    
+    LOG(INFO) << "download end, ret:" << ret << ",length:" << length << ",databuf:" << databuf;
     return length;
 }
 
-int S3ClientImpl::Append(std::string name, const char*buf, uint64_t length) {
+int S3ClientImpl::Append(std::string name, const char* buf, uint64_t length) {
     std::string data;
+    std::string appendData(buf, length);
     int ret = 0;
 
     const Aws::String aws_key(name.c_str(), name.size());
+
+    LOG(INFO) << "append get object start, aws_key:" << aws_key << ",length:" << length;
     ret = s3Adapter_.GetObject(aws_key, &data);
     if (ret < 0) {
+        LOG(INFO) << "append get object error:" << ret;
         return ret;        
     }
 
-    data.append(buf, 0, length);
+    data += appendData;
+    LOG(INFO) << "append put object start, aws_key:" << aws_key << ",data len:" << data.length();
     ret = s3Adapter_.PutObject(aws_key, data);
-    
+    LOG(INFO) << "append put object end, ret:" << ret;
+
     return ret;
 }
 
