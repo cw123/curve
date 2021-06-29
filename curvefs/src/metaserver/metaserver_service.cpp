@@ -298,8 +298,17 @@ void MetaServerServiceImpl::UpdateInodeS3Version(
     brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
     uint32_t fsId = request->fsid();
     uint64_t inodeId = request->inodeid();
-    MetaStatusCode status = inodeManager_->UpdateInodeVersion(fsId, inodeId);
+    uint64_t version;
+    MetaStatusCode status = inodeManager_->UpdateInodeVersion(fsId, inodeId,
+                                                                &version);
     response->set_statuscode(status);
+    if (status != MetaStatusCode::OK) {
+        LOG(ERROR) << "UpdateInodeS3Version fail, fsId = " << fsId
+                   << ", inodeId = " << inodeId
+                   << ", ret = " << MetaStatusCode_Name(status);
+    } else {
+        response->set_version(version);
+    }
     return;
 }
 

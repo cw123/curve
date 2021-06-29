@@ -107,7 +107,7 @@ message S3ChunkInfo {
     required uint64 version = 2;
     required uint64 offset = 3;
     required uint64 len = 4;  // file logic length
-    required uint64 size = 5; // file size in object storage  
+    required uint64 size = 5; // file size in object storage
 };
 
 message S3ChunkInfoList {
@@ -191,13 +191,13 @@ message DeleteInodeResponse {
 
 message UpdateInodeS3VersionRequest {
     required uint64 inodeId = 1;
-    required uint32 fsId = 2;   
+    required uint32 fsId = 2;
 }
- 
+
 message UpdateInodeS3VersionResponse {
     required MetaStatusCode statusCode = 1;
-    required uint64 version = 2;
-} 
+    optional uint64 version = 2;
+}
 
 service MetaServerService {
     // dentry interface
@@ -213,7 +213,7 @@ service MetaServerService {
     rpc DeleteInode(DeleteInodeRequest) returns (DeleteInodeResponse);
     rpc CreateRootInode(CreateRootInodeRequest) returns
                                             (CreateRootInodeResponse);
-    rpc UpdateInodeS3Version(UpdateInodeS3VersionRequest) returns 
+    rpc UpdateInodeS3Version(UpdateInodeS3VersionRequest) returns
                                         (UpdateInodeS3VersionResponse);
 }
 

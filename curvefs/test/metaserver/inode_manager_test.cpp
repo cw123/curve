@@ -95,6 +95,12 @@ TEST_F(InodeManagerTest, test1) {
               MetaStatusCode::OK);
     ASSERT_EQ(inode3.inodeid(), 4);
 
+    Inode inode4;
+    ASSERT_EQ(manager.CreateInode(fsId, length, uid, gid, mode,
+                                  FsFileType::TYPE_S3, symlink, &inode4),
+              MetaStatusCode::OK);
+    ASSERT_EQ(inode4.inodeid(), 5);
+
     // GET
     Inode temp1;
     ASSERT_EQ(manager.GetInode(fsId, inode1.inodeid(), &temp1),
@@ -111,21 +117,41 @@ TEST_F(InodeManagerTest, test1) {
                             MetaStatusCode::OK);
     ASSERT_TRUE(CompareInode(inode3, temp3));
 
+    Inode temp4;
+    ASSERT_EQ(manager.GetInode(fsId, inode4.inodeid(), &temp4),
+                            MetaStatusCode::OK);
+    ASSERT_TRUE(CompareInode(inode4, temp4));
+
     // DELETE
     ASSERT_EQ(manager.DeleteInode(fsId, inode1.inodeid()), MetaStatusCode::OK);
     ASSERT_EQ(manager.DeleteInode(fsId, inode1.inodeid()),
                             MetaStatusCode::NOT_FOUND);
     ASSERT_EQ(manager.GetInode(fsId, inode1.inodeid(), &temp1),
                             MetaStatusCode::NOT_FOUND);
+
     // UPDATE
     ASSERT_EQ(manager.UpdateInode(inode1), MetaStatusCode::NOT_FOUND);
     temp2.set_atime(100);
     ASSERT_EQ(manager.UpdateInode(temp2), MetaStatusCode::OK);
-    Inode temp4;
-    ASSERT_EQ(manager.GetInode(fsId, inode2.inodeid(), &temp4),
+    Inode temp5;
+    ASSERT_EQ(manager.GetInode(fsId, inode2.inodeid(), &temp5),
                             MetaStatusCode::OK);
-    ASSERT_TRUE(CompareInode(temp4, temp2));
+    ASSERT_TRUE(CompareInode(temp5, temp2));
     ASSERT_FALSE(CompareInode(inode2, temp2));
+
+    // UPDATE VERSION
+    uint64_t version = 0;
+    ASSERT_EQ(manager.UpdateInodeVersion(fsId, inode4.inodeid(), &version),
+                                            MetaStatusCode::OK);
+    ASSERT_EQ(version, 1);
+    ASSERT_EQ(manager.UpdateInodeVersion(fsId, inode4.inodeid(), &version),
+                                            MetaStatusCode::OK);
+    ASSERT_EQ(version, 2);
+
+    ASSERT_EQ(manager.UpdateInodeVersion(fsId, inode2.inodeid(), &version),
+                                            MetaStatusCode::PARAM_ERROR);
+    ASSERT_EQ(manager.UpdateInodeVersion(fsId, inode1.inodeid(), &version),
+                                            MetaStatusCode::NOT_FOUND);
 }
 }  // namespace metaserver
 }  // namespace curvefs

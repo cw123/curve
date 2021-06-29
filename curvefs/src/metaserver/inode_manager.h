@@ -49,7 +49,8 @@ class InodeManager {
 
     MetaStatusCode UpdateInode(const Inode &inode);
 
-    MetaStatusCode UpdateInodeVersion(uint32_t fsId, uint64_t inodeId);
+    MetaStatusCode UpdateInodeVersion(uint32_t fsId, uint64_t inodeId,
+                                    uint64_t *version);
 
  private:
     uint64_t GetNextId();
