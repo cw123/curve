@@ -144,6 +144,23 @@ TEST_F(MetaserverServiceTest, inodeTest) {
         ASSERT_TRUE(false);
     }
 
+    cntl.Reset();
+    createRequest.set_type(FsFileType::TYPE_S3);
+    CreateInodeResponse createResponse2;
+    stub.CreateInode(&cntl, &createRequest, &createResponse2, NULL);
+    if (!cntl.Failed()) {
+        ASSERT_EQ(createResponse2.statuscode(), MetaStatusCode::OK);
+        ASSERT_TRUE(createResponse2.has_inode());
+        ASSERT_EQ(createResponse2.inode().length(), length);
+        ASSERT_EQ(createResponse2.inode().uid(), uid);
+        ASSERT_EQ(createResponse2.inode().gid(), gid);
+        ASSERT_EQ(createResponse2.inode().mode(), mode);
+        ASSERT_EQ(createResponse2.inode().type(), FsFileType::TYPE_S3);
+    } else {
+        LOG(ERROR) << "error = " << cntl.ErrorText();
+        ASSERT_TRUE(false);
+    }
+
     // TEST GET INODE
     cntl.Reset();
     GetInodeRequest getRequest;
@@ -170,7 +187,7 @@ TEST_F(MetaserverServiceTest, inodeTest) {
     GetInodeRequest getRequest2;
     GetInodeResponse getResponse2;
     getRequest2.set_fsid(fsId);
-    getRequest2.set_inodeid(createResponse.inode().inodeid() + 1);
+    getRequest2.set_inodeid(createResponse.inode().inodeid() + 2);
     stub.GetInode(&cntl, &getRequest2, &getResponse2, NULL);
     if (!cntl.Failed()) {
         ASSERT_EQ(getResponse2.statuscode(), MetaStatusCode::NOT_FOUND);
@@ -233,6 +250,48 @@ TEST_F(MetaserverServiceTest, inodeTest) {
         ASSERT_FALSE(CompareInode(createResponse.inode(),
                                   getResponse4.inode()));
         ASSERT_EQ(getResponse4.inode().length(), length + 1);
+    } else {
+        LOG(ERROR) << "error = " << cntl.ErrorText();
+        ASSERT_TRUE(false);
+    }
+
+    // UPDATE INODE VERSION
+    cntl.Reset();
+    UpdateInodeS3VersionRequest updateVersionRequest;
+    UpdateInodeS3VersionResponse updateVersionResponse;
+    updateVersionRequest.set_fsid(fsId);
+    updateVersionRequest.set_inodeid(createResponse2.inode().inodeid());
+    stub.UpdateInodeS3Version(&cntl, &updateVersionRequest,
+                                     &updateVersionResponse, NULL);
+    if (!cntl.Failed()) {
+        ASSERT_EQ(updateVersionResponse.statuscode(), MetaStatusCode::OK);
+        ASSERT_EQ(updateVersionResponse.version(), 1);
+    } else {
+        LOG(ERROR) << "error = " << cntl.ErrorText();
+        ASSERT_TRUE(false);
+    }
+
+    cntl.Reset();
+    updateVersionRequest.set_fsid(fsId);
+    updateVersionRequest.set_inodeid(createResponse2.inode().inodeid());
+    stub.UpdateInodeS3Version(&cntl, &updateVersionRequest,
+                                     &updateVersionResponse, NULL);
+    if (!cntl.Failed()) {
+        ASSERT_EQ(updateVersionResponse.statuscode(), MetaStatusCode::OK);
+        ASSERT_EQ(updateVersionResponse.version(), 2);
+    } else {
+        LOG(ERROR) << "error = " << cntl.ErrorText();
+        ASSERT_TRUE(false);
+    }
+
+    cntl.Reset();
+    updateVersionRequest.set_fsid(fsId);
+    updateVersionRequest.set_inodeid(createResponse.inode().inodeid());
+    stub.UpdateInodeS3Version(&cntl, &updateVersionRequest,
+                                     &updateVersionResponse, NULL);
+    if (!cntl.Failed()) {
+        ASSERT_EQ(updateVersionResponse.statuscode(),
+                            MetaStatusCode::PARAM_ERROR);
     } else {
         LOG(ERROR) << "error = " << cntl.ErrorText();
         ASSERT_TRUE(false);

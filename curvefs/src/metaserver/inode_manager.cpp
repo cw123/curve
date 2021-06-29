@@ -177,7 +177,7 @@ MetaStatusCode InodeManager::UpdateInode(const Inode &inode) {
 }
 
 MetaStatusCode InodeManager::UpdateInodeVersion(uint32_t fsId,
-                                    uint64_t inodeId) {
+                                    uint64_t inodeId, uint64_t *version) {
     LOG(INFO) << "UpdateInodeVersion, fsId = " << fsId
               << ", inodeId = " << inodeId;
     Inode inode;
@@ -210,6 +210,7 @@ MetaStatusCode InodeManager::UpdateInodeVersion(uint32_t fsId,
         return ret;
     }
 
+    *version = inode.version();
     LOG(INFO) << "UpdateInodeVersion success, " << inode.DebugString();
     return MetaStatusCode::OK;
 }
